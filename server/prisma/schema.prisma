@@ -1,0 +1,88 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum TaskStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum TaskType {
+  FILE_PROCESSING
+  DATA_EXPORT
+  REPORT_GENERATION
+  WEB_SCRAPE
+  NOTIFICATION_DISPATCH
+}
+
+model User {
+  id            String         @id @default(uuid())
+  email         String         @unique
+  passwordHash  String
+  name          String
+  role          Role           @default(USER)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  tasks         Task[]
+  refreshTokens RefreshToken[]
+
+  @@index([email])
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model Task {
+  id          String     @id @default(uuid())
+  title       String
+  description String?
+  type        TaskType   @default(FILE_PROCESSING)
+  status      TaskStatus @default(PENDING)
+  priority    Int        @default(1)
+  payload     Json?
+  result      Json?
+  error       String?
+  attempts    Int        @default(0)
+  maxAttempts Int        @default(3)
+  progress    Int        @default(0)
+  scheduledAt DateTime?
+  completedAt DateTime?
+  failedAt    DateTime?
+  userId      String
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  taskLogs    TaskLog[]
+
+  @@index([userId, status])
+  @@index([createdAt])
+}
+
+model TaskLog {
+  id        String   @id @default(uuid())
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  level     String
+  message   String
+  createdAt DateTime @default(now())
+
+  @@index([taskId])
+}
