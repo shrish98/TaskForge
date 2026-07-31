@@ -6,6 +6,7 @@ import morgan from 'morgan';
 import dotenv from 'dotenv';
 
 import authRoutes from './routes/auth.routes.js';
+import taskRoutes from './routes/task.routes.js';
 import { errorHandler } from './middlewares/error.middleware.js';
 import { apiRateLimiter } from './middlewares/rateLimiter.middleware.js';
 
@@ -36,6 +37,7 @@ app.get('/health', (req, res) => {
 
 // API Routes
 app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/tasks', taskRoutes);
 
 // Centralized Error Middleware
 app.use(errorHandler);
