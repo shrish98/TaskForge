@@ -5,6 +5,10 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
 
+import authRoutes from './routes/auth.routes.js';
+import { errorHandler } from './middlewares/error.middleware.js';
+import { apiRateLimiter } from './middlewares/rateLimiter.middleware.js';
+
 dotenv.config();
 
 const app = express();
@@ -17,22 +21,24 @@ app.use(cors());
 app.use(helmet());
 app.use(morgan('dev'));
 
-// Health Check Endpoint
+// Global Rate Limiting
+app.use('/api', apiRateLimiter);
+
+// System Health Check
 app.get('/health', (req, res) => {
   res.status(200).json({
     status: 'OK',
     uptime: process.uptime(),
     timestamp: new Date().toISOString(),
-    service: 'Saarthi AI - API Gateway'
+    service: 'Saarthi AI - Express API Gateway Engine',
   });
 });
 
-app.get('/api/v1', (req, res) => {
-  res.status(200).json({
-    message: 'Welcome to Saarthi AI Task Automation & Job Processing API Gateway',
-    version: '1.0.0'
-  });
-});
+// API Routes
+app.use('/api/v1/auth', authRoutes);
+
+// Centralized Error Middleware
+app.use(errorHandler);
 
 server.listen(PORT, () => {
   console.log(`🚀 [Server] Express API Gateway running on port ${PORT}`);
