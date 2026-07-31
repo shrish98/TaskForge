@@ -22,7 +22,7 @@ export const worker = new Worker<TaskJobData>(
 
 // Worker Event Listeners
 worker.on('active', async (job: Job<TaskJobData>) => {
-  const { taskId } = job.data;
+  const { taskId, userId } = job.data;
   logger.info(`▶️ [Worker] Job #${job.id} is now ACTIVE (Task ID: ${taskId})`);
 
   try {
@@ -35,7 +35,7 @@ worker.on('active', async (job: Job<TaskJobData>) => {
 });
 
 worker.on('progress', async (job: Job<TaskJobData>, progress: any) => {
-  const { taskId } = job.data;
+  const { taskId, userId } = job.data;
   const progressPercent = typeof progress === 'number' ? progress : parseInt(String(progress), 10) || 50;
 
   try {
@@ -47,15 +47,16 @@ worker.on('progress', async (job: Job<TaskJobData>, progress: any) => {
 });
 
 worker.on('completed', async (job: Job<TaskJobData>, result: any) => {
-  const { taskId } = job.data;
+  const { taskId, userId } = job.data;
   logger.info(`✅ [Worker] Job #${job.id} COMPLETED successfully (Task ID: ${taskId})`);
 
   try {
+    const outputResult = result?.output || result;
     await taskRepository.updateStatus(
       taskId,
       TaskStatus.COMPLETED,
       100,
-      result?.output || result,
+      outputResult,
       undefined
     );
     await taskRepository.createTaskLog(
@@ -71,7 +72,7 @@ worker.on('completed', async (job: Job<TaskJobData>, result: any) => {
 worker.on('failed', async (job: Job<TaskJobData> | undefined, err: Error) => {
   if (!job) return;
 
-  const { taskId } = job.data;
+  const { taskId, userId } = job.data;
   const isFinalAttempt = job.attemptsMade >= (job.opts.attempts || 3);
   logger.error(
     `❌ [Worker] Job #${job.id} FAILED (Task ID: ${taskId}, Attempt ${job.attemptsMade}/${job.opts.attempts}): ${err.message}`

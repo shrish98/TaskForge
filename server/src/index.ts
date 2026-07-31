@@ -9,11 +9,16 @@ import authRoutes from './routes/auth.routes.js';
 import taskRoutes from './routes/task.routes.js';
 import { errorHandler } from './middlewares/error.middleware.js';
 import { apiRateLimiter } from './middlewares/rateLimiter.middleware.js';
+import { initSocketServer } from './socket/socket.server.js';
+import { logger } from './utils/logger.js';
 
 dotenv.config();
 
 const app = express();
 const server = http.createServer(app);
+
+// Initialize Socket.IO Real-time Engine
+const io = initSocketServer(server);
 
 const PORT = process.env.PORT || 5000;
 
@@ -31,7 +36,8 @@ app.get('/health', (req, res) => {
     status: 'OK',
     uptime: process.uptime(),
     timestamp: new Date().toISOString(),
-    service: 'Saarthi AI - Express API Gateway Engine',
+    service: 'Saarthi AI - Express API Gateway & Socket.IO Engine',
+    websockets: io ? 'Active' : 'Inactive',
   });
 });
 
@@ -43,7 +49,7 @@ app.use('/api/v1/tasks', taskRoutes);
 app.use(errorHandler);
 
 server.listen(PORT, () => {
-  console.log(`🚀 [Server] Express API Gateway running on port ${PORT}`);
+  logger.info(`🚀 [Server] Express API Gateway & Socket.IO Engine running on port ${PORT}`);
 });
 
-export { app, server };
+export { app, server, io };
