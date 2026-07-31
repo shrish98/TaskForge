@@ -1,6 +1,8 @@
 import { taskRepository, CreateTaskData, TaskQueryOptions } from '../repositories/task.repository.js';
 import { ApiError } from '../utils/ApiError.js';
 import { TaskStatus } from '@prisma/client';
+import { addJobToQueue } from '../queues/task.queue.js';
+import { logger } from '../utils/logger.js';
 
 export class TaskService {
   async createTask(data: CreateTaskData) {
@@ -13,6 +15,16 @@ export class TaskService {
         ? `Task created and scheduled for execution at ${data.scheduledAt.toISOString()}`
         : 'Task created and queued for asynchronous execution'
     );
+
+    // Calculate delay if scheduled in future
+    const delayMs = data.scheduledAt ? Math.max(0, data.scheduledAt.getTime() - Date.now()) : 0;
+
+    // Push job to BullMQ Redis Queue
+    try {
+      await addJobToQueue(task.id, task.userId, task.type, task.payload || {}, task.priority, delayMs);
+    } catch (err: any) {
+      logger.error(`Failed to push task ${task.id} to BullMQ queue: ${err.message}`);
+    }
 
     return task;
   }
@@ -85,6 +97,20 @@ export class TaskService {
     const retriedTask = await taskRepository.updateStatus(taskId, TaskStatus.PENDING, 0, null, undefined);
 
     await taskRepository.createTaskLog(taskId, 'INFO', 'Task manually re-queued for retry by user');
+
+    // Re-add to BullMQ Redis Queue
+    try {
+      await addJobToQueue(
+        retriedTask.id,
+        retriedTask.userId,
+        retriedTask.type,
+        retriedTask.payload || {},
+        retriedTask.priority,
+        0
+      );
+    } catch (err: any) {
+      logger.error(`Failed to re-queue retried task ${taskId}: ${err.message}`);
+    }
 
     return retriedTask;
   }
