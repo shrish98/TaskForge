@@ -8,6 +8,7 @@
     "dev:worker": "npm run worker:dev --prefix server",
     "dev:client": "npm run dev --prefix client",
     "build": "npm run build --prefix server && npm run build --prefix client",
+    "clean": "powershell -Command \"Remove-Item -Recurse -Force client/.next -ErrorAction SilentlyContinue\"",
     "test": "npm run test --prefix server"
   },
   "devDependencies": {
