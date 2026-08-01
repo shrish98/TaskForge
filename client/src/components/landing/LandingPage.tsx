@@ -30,12 +30,17 @@ import {
 export const LandingPage: React.FC = () => {
   const router = useRouter();
   const { isAuthenticated, user } = useAppSelector((state) => state.auth);
+  const [isMounted, setIsMounted] = useState(false);
 
   // Live Interactive Demo Simulation State
   const [demoProgress, setDemoProgress] = useState(35);
   const [demoStatus, setDemoStatus] = useState<'PENDING' | 'PROCESSING' | 'COMPLETED'>('PROCESSING');
   const [activeCodeTab, setActiveCodeTab] = useState<'curl' | 'node' | 'worker'>('node');
   const [openFaq, setOpenFaq] = useState<number | null>(0);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   // Simulate real-time job progress ring on landing page
   useEffect(() => {
@@ -183,7 +188,7 @@ export const taskWorker = new Worker('task_queue', async (job) => {
 
           {/* Nav Links & Auth CTA */}
           <div className="flex items-center gap-4">
-            {isAuthenticated ? (
+            {isMounted && isAuthenticated ? (
               <button
                 onClick={() => router.push('/')}
                 className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 px-5 py-2.5 text-xs font-bold text-white shadow-lg shadow-indigo-600/30 hover:shadow-indigo-600/50 hover:scale-[1.02] transition-all"
