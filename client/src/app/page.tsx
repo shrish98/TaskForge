@@ -32,17 +32,27 @@ import {
   RefreshCw,
 } from 'lucide-react';
 
+import { LandingPage } from '@/components/landing/LandingPage';
 import { useAppSelector } from '@/store/store';
 
 export default function HomePage() {
+  const [showLanding, setShowLanding] = useState(false);
+
+  // Check if token exists in browser
+  const hasToken = typeof window !== 'undefined' ? Boolean(localStorage.getItem('accessToken')) : false;
+
+  if (!hasToken || showLanding) {
+    return <LandingPage />;
+  }
+
   return (
     <AuthGuard>
-      <DashboardContent />
+      <DashboardContent onShowLanding={() => setShowLanding(true)} />
     </AuthGuard>
   );
 }
 
-function DashboardContent() {
+function DashboardContent({ onShowLanding }: { onShowLanding?: () => void }) {
   const { user } = useAppSelector((state) => state.auth);
   const queryClient = useQueryClient();
   const { isConnected } = useSocket();
