@@ -21,7 +21,7 @@ async function main() {
   // Seed Users
   const adminUser = await prisma.user.create({
     data: {
-      email: 'admin@saarthi.ai',
+      email: 'admin@taskforge.ai',
       passwordHash: adminPasswordHash,
       name: 'System Administrator',
       role: Role.ADMIN,
@@ -30,7 +30,7 @@ async function main() {
 
   const demoUser = await prisma.user.create({
     data: {
-      email: 'user@saarthi.ai',
+      email: 'user@taskforge.ai',
       passwordHash: userPasswordHash,
       name: 'Demo SaaS User',
       role: Role.USER,

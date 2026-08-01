@@ -6,7 +6,7 @@ import { taskRepository } from './repositories/task.repository.js';
 import { TaskStatus } from '@prisma/client';
 import { logger } from './utils/logger.js';
 
-console.log('⚡ [Worker Process] Initializing Saarthi AI BullMQ Task Worker...');
+console.log('⚡ [Worker Process] Initializing TaskForge BullMQ Task Worker...');
 
 export const worker = new Worker<TaskJobData>(
   TASK_QUEUE_NAME,

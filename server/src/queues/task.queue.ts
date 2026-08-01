@@ -2,7 +2,7 @@ import { Queue } from 'bullmq';
 import { redisConfig } from '../config/redis.js';
 import { logger } from '../utils/logger.js';
 
-export const TASK_QUEUE_NAME = 'saarthi-task-queue';
+export const TASK_QUEUE_NAME = 'taskforge-task-queue';
 
 export interface TaskJobData {
   taskId: string;

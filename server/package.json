@@ -1,5 +1,5 @@
 {
-  "name": "saarthi-server",
+  "name": "taskforge-server",
   "version": "1.0.0",
   "description": "Task Automation & Job Processing Platform - Express API Gateway & BullMQ Worker",
   "main": "dist/index.js",

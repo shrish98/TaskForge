@@ -36,7 +36,7 @@ app.get('/health', (req, res) => {
     status: 'OK',
     uptime: process.uptime(),
     timestamp: new Date().toISOString(),
-    service: 'Saarthi AI - Express API Gateway & Socket.IO Engine',
+    service: 'TaskForge - Express API Gateway & Socket.IO Engine',
     websockets: io ? 'Active' : 'Inactive',
   });
 });

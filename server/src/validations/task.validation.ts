@@ -6,7 +6,7 @@ export const createTaskSchema = z.object({
   description: z.string().max(1000).optional(),
   type: z.nativeEnum(TaskType).optional().default(TaskType.FILE_PROCESSING),
   priority: z.number().int().min(1).max(3).optional().default(1),
-  payload: z.record(z.any()).optional(),
+  payload: z.record(z.string(), z.any()).optional(),
   scheduledAt: z
     .string()
     .datetime()
@@ -19,7 +19,7 @@ export const updateTaskSchema = z.object({
   description: z.string().max(1000).optional(),
   type: z.nativeEnum(TaskType).optional(),
   priority: z.number().int().min(1).max(3).optional(),
-  payload: z.record(z.any()).optional(),
+  payload: z.record(z.string(), z.any()).optional(),
 });
 
 export const taskQuerySchema = z.object({

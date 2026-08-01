@@ -1,6 +1,6 @@
-# 🚀 Saarthi AI - Task Automation & Job Processing SaaS Platform
+# 🚀 TaskForge - Task Automation & Job Processing SaaS Platform
 
-> **Full-Stack Technical Assessment** built for Saarthi AI Private Limited.
+> **Full-Stack Technical Assessment** built with TaskForge.
 
 This application is a production-ready **Micro-SaaS Job Processing Platform** featuring asynchronous background job execution via **BullMQ**, real-time live status updates via **Socket.IO WebSockets**, dual **JWT authentication with Redis refresh token storage**, relational persistence with **PostgreSQL & Prisma ORM**, and a modern dashboard built with **Next.js 14 (App Router)**.
 
@@ -9,7 +9,7 @@ This application is a production-ready **Micro-SaaS Job Processing Platform** fe
 ## 🏗️ Architecture & Component Breakdown
 
 ```
-saarthi-ai-assessment/
+taskforge/
 ├── .github/
 │   └── workflows/
 │       └── ci.yml             # Automated GitHub Actions CI/CD Pipeline
@@ -53,8 +53,8 @@ Ensure you have [Docker](https://www.docker.com/) installed on your machine.
 
 ```bash
 # 1. Clone the public repository
-git clone https://github.com/shrish98/saarthi-ai-assessment.git
-cd saarthi-ai-assessment
+git clone https://github.com/shrish98/taskforge.git
+cd taskforge
 
 # 2. Copy environment configuration
 cp .env.example .env
