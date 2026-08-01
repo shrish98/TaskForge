@@ -87,7 +87,11 @@ export const taskService = {
     if (options.sortOrder) params.sortOrder = options.sortOrder;
 
     const res = await api.get('/tasks', { params });
-    return res.data.data;
+    const responseData = res.data.data;
+    return {
+      tasks: responseData?.data || (Array.isArray(responseData) ? responseData : []),
+      pagination: responseData?.meta || { total: 0, page: 1, limit: 10, totalPages: 1 },
+    };
   },
 
   async getTaskById(taskId: string): Promise<Task> {
