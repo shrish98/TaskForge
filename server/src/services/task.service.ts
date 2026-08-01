@@ -30,7 +30,7 @@ export class TaskService {
   }
 
   async getTasks(options: TaskQueryOptions, userRole: 'USER' | 'ADMIN') {
-    return taskRepository.findMany(options);
+    return taskRepository.findMany({ ...options, userRole });
   }
 
   async getTaskById(taskId: string, userId: string, userRole: 'USER' | 'ADMIN') {
@@ -116,7 +116,7 @@ export class TaskService {
   }
 
   async getStatsSummary(userId: string, userRole: 'USER' | 'ADMIN') {
-    return taskRepository.getSummaryStats(userId);
+    return taskRepository.getSummaryStats(userId, userRole);
   }
 }
 

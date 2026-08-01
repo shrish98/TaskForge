@@ -13,6 +13,7 @@ export interface CreateTaskData {
 
 export interface TaskQueryOptions {
   userId: string;
+  userRole?: 'USER' | 'ADMIN';
   search?: string;
   status?: TaskStatus;
   type?: TaskType;
@@ -48,10 +49,13 @@ export class TaskRepository {
     });
   }
 
-  async findById(id: string): Promise<(Task & { taskLogs: any[] }) | null> {
+  async findById(id: string): Promise<(Task & { taskLogs: any[]; user?: { email: string; name: string } }) | null> {
     return prisma.task.findUnique({
       where: { id },
       include: {
+        user: {
+          select: { email: true, name: true },
+        },
         taskLogs: {
           orderBy: { createdAt: 'desc' },
         },
@@ -59,13 +63,13 @@ export class TaskRepository {
     });
   }
 
-  async findMany(options: TaskQueryOptions): Promise<PaginatedResult<Task>> {
+  async findMany(options: TaskQueryOptions): Promise<PaginatedResult<any>> {
     const page = Math.max(1, options.page || 1);
     const limit = Math.max(1, Math.min(100, options.limit || 10));
     const skip = (page - 1) * limit;
 
     const where: Prisma.TaskWhereInput = {
-      userId: options.userId,
+      ...(options.userRole === 'ADMIN' ? {} : { userId: options.userId }),
       ...(options.status ? { status: options.status } : {}),
       ...(options.type ? { type: options.type } : {}),
       ...(options.search
@@ -88,6 +92,11 @@ export class TaskRepository {
         skip,
         take: limit,
         orderBy: { [sortBy]: sortOrder },
+        include: {
+          user: {
+            select: { email: true, name: true, role: true },
+          },
+        },
       }),
     ]);
 
@@ -152,13 +161,15 @@ export class TaskRepository {
     });
   }
 
-  async getSummaryStats(userId: string) {
+  async getSummaryStats(userId: string, userRole?: 'USER' | 'ADMIN') {
+    const whereClause: Prisma.TaskWhereInput = userRole === 'ADMIN' ? {} : { userId };
+
     const [total, pending, processing, completed, failed] = await Promise.all([
-      prisma.task.count({ where: { userId } }),
-      prisma.task.count({ where: { userId, status: TaskStatus.PENDING } }),
-      prisma.task.count({ where: { userId, status: TaskStatus.PROCESSING } }),
-      prisma.task.count({ where: { userId, status: TaskStatus.COMPLETED } }),
-      prisma.task.count({ where: { userId, status: TaskStatus.FAILED } }),
+      prisma.task.count({ where: whereClause }),
+      prisma.task.count({ where: { ...whereClause, status: TaskStatus.PENDING } }),
+      prisma.task.count({ where: { ...whereClause, status: TaskStatus.PROCESSING } }),
+      prisma.task.count({ where: { ...whereClause, status: TaskStatus.COMPLETED } }),
+      prisma.task.count({ where: { ...whereClause, status: TaskStatus.FAILED } }),
     ]);
 
     return {

@@ -3,8 +3,13 @@ import { TASK_QUEUE_NAME, TaskJobData } from './queues/task.queue.js';
 import { TaskProcessor } from './queues/task.processor.js';
 import { redisConfig } from './config/redis.js';
 import { taskRepository } from './repositories/task.repository.js';
-import { TaskStatus } from '@prisma/client';
 import { logger } from './utils/logger.js';
+import { TaskStatus } from '@prisma/client';
+import dotenv from 'dotenv';
+import path from 'path';
+
+dotenv.config({ path: path.resolve(process.cwd(), '.env') });
+dotenv.config({ path: path.resolve(process.cwd(), '../.env') });
 
 console.log('⚡ [Worker Process] Initializing TaskForge BullMQ Task Worker...');
 

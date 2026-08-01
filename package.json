@@ -1,0 +1,16 @@
+{
+  "name": "taskforge-root",
+  "version": "1.0.0",
+  "description": "TaskForge - Monorepo root runner for Express API Gateway, BullMQ Worker, and Next.js Client",
+  "scripts": {
+    "dev": "concurrently -k -p \"[{name}]\" -n \"SERVER,WORKER,CLIENT\" -c \"cyan.bold,magenta.bold,green.bold\" \"npm run dev --prefix server\" \"npm run worker:dev --prefix server\" \"npm run dev --prefix client\"",
+    "dev:server": "npm run dev --prefix server",
+    "dev:worker": "npm run worker:dev --prefix server",
+    "dev:client": "npm run dev --prefix client",
+    "build": "npm run build --prefix server && npm run build --prefix client",
+    "test": "npm run test --prefix server"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

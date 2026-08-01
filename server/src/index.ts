@@ -12,7 +12,10 @@ import { apiRateLimiter } from './middlewares/rateLimiter.middleware.js';
 import { initSocketServer } from './socket/socket.server.js';
 import { logger } from './utils/logger.js';
 
-dotenv.config();
+import path from 'path';
+
+dotenv.config({ path: path.resolve(process.cwd(), '.env') });
+dotenv.config({ path: path.resolve(process.cwd(), '../.env') });
 
 const app = express();
 const server = http.createServer(app);

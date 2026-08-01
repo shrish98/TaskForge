@@ -4,8 +4,8 @@
   "description": "Task Automation & Job Processing Platform - Express API Gateway & BullMQ Worker",
   "main": "dist/index.js",
   "scripts": {
-    "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
-    "worker:dev": "ts-node-dev --respawn --transpile-only src/worker.ts",
+    "dev": "tsx watch src/index.ts",
+    "worker:dev": "tsx watch src/worker.ts",
     "build": "tsc",
     "start": "node dist/index.js",
     "start:worker": "node dist/worker.js",
@@ -47,6 +47,7 @@
     "ts-jest": "^29.1.2",
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
+    "tsx": "^4.23.1",
     "typescript": "^5.4.5"
   }
 }

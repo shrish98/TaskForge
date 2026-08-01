@@ -7,7 +7,7 @@ import { Button } from '../ui/Button';
 import { Search, RotateCcw, Trash2, Eye, Filter, ArrowUpDown, Layers } from 'lucide-react';
 
 interface TaskTableProps {
-  tasks: Task[];
+  tasks: (Task & { user?: { email: string; name: string } })[];
   pagination: {
     total: number;
     page: number;
@@ -26,6 +26,7 @@ interface TaskTableProps {
   onRetryTask: (taskId: string) => void;
   onDeleteTask: (taskId: string) => void;
   isLoading?: boolean;
+  isAdmin?: boolean;
 }
 
 export const TaskTable: React.FC<TaskTableProps> = ({
@@ -43,6 +44,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
   onRetryTask,
   onDeleteTask,
   isLoading = false,
+  isAdmin = false,
 }) => {
   const statusTabs: Array<{ id: TaskStatus | 'ALL'; label: string }> = [
     { id: 'ALL', label: 'All Tasks' },
@@ -109,6 +111,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
           <thead>
             <tr className="border-b border-slate-800 text-slate-400 uppercase tracking-wider font-semibold bg-slate-950/50">
               <th className="py-3 px-4">Task Details</th>
+              {isAdmin && <th className="py-3 px-4 text-purple-400 font-bold">Task Owner</th>}
               <th className="py-3 px-4">Status</th>
               <th className="py-3 px-4">Progress</th>
               <th className="py-3 px-4">Priority</th>
@@ -119,7 +122,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
           <tbody className="divide-y divide-slate-800/60">
             {isLoading ? (
               <tr>
-                <td colSpan={6} className="py-8 text-center text-slate-400">
+                <td colSpan={isAdmin ? 7 : 6} className="py-8 text-center text-slate-400">
                   <div className="flex justify-center items-center gap-2">
                     <svg className="h-5 w-5 animate-spin text-indigo-500" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -135,7 +138,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
               </tr>
             ) : tasks.length === 0 ? (
               <tr>
-                <td colSpan={6} className="py-12 text-center text-slate-500 italic">
+                <td colSpan={isAdmin ? 7 : 6} className="py-12 text-center text-slate-500 italic">
                   No task records found matching your filters.
                 </td>
               </tr>
@@ -151,6 +154,15 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                       <span className="text-indigo-400">{task.type}</span>
                     </div>
                   </td>
+
+                  {/* Task Owner (Admin View) */}
+                  {isAdmin && (
+                    <td className="py-3.5 px-4 font-mono text-[11px]">
+                      <span className="rounded bg-purple-500/10 border border-purple-500/20 px-2 py-0.5 text-purple-300 font-semibold">
+                        {task.user?.email || 'System'}
+                      </span>
+                    </td>
+                  )}
 
                   {/* Status Badge */}
                   <td className="py-3.5 px-4">

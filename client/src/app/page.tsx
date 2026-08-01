@@ -32,6 +32,8 @@ import {
   RefreshCw,
 } from 'lucide-react';
 
+import { useAppSelector } from '@/store/store';
+
 export default function HomePage() {
   return (
     <AuthGuard>
@@ -41,8 +43,10 @@ export default function HomePage() {
 }
 
 function DashboardContent() {
+  const { user } = useAppSelector((state) => state.auth);
   const queryClient = useQueryClient();
   const { isConnected } = useSocket();
+  const isAdmin = user?.role === 'ADMIN';
 
   // Component States
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -239,6 +243,26 @@ function DashboardContent() {
             </Card>
           </div>
 
+          {/* Admin Overview Mode Banner */}
+          {isAdmin && (
+            <div className="rounded-2xl border border-purple-500/30 bg-purple-500/10 p-4 text-xs text-purple-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-lg shadow-purple-500/5">
+              <div className="flex items-center gap-3">
+                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-purple-500/20 text-purple-300 font-bold border border-purple-500/30">
+                  🛡️
+                </div>
+                <div>
+                  <span className="font-bold uppercase tracking-wider text-purple-300">Global Admin Oversight Active</span>
+                  <p className="text-[11px] text-purple-300/80">
+                    You have global administrative visibility. Viewing, managing, and retrying tasks across all platform users.
+                  </p>
+                </div>
+              </div>
+              <span className="rounded-full bg-purple-500/20 px-3 py-1 text-[10px] font-bold text-purple-300 border border-purple-500/40 shrink-0">
+                SYSTEM-WIDE ACCESS
+              </span>
+            </div>
+          )}
+
           {/* Interactive Task Queue Table */}
           <TaskTable
             tasks={tasksData?.tasks || []}
@@ -266,6 +290,7 @@ function DashboardContent() {
             onRetryTask={handleRetryTask}
             onDeleteTask={handleDeleteTask}
             isLoading={isTasksLoading}
+            isAdmin={isAdmin}
           />
         </main>
       </div>
