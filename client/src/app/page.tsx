@@ -71,7 +71,7 @@ export default function HomePage() {
   return (
     <div className="flex min-h-screen flex-col bg-[#090d16] text-slate-100 selection:bg-indigo-500/30">
       {/* Step 7 Layout - Top Navbar */}
-      <Navbar user={dummyUser} />
+      <Navbar />
 
       <div className="flex flex-1">
         {/* Step 7 Layout - Left Navigation Sidebar */}

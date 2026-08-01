@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import { Providers } from '@/providers/Providers';
 
 export const metadata: Metadata = {
   title: 'TaskForge | Task Automation & Job Processing Engine',
@@ -14,7 +15,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className="bg-background text-slate-100 antialiased font-sans">
-        {children}
+        <Providers>{children}</Providers>
       </body>
     </html>
   );
