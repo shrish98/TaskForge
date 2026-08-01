@@ -75,13 +75,13 @@ function DashboardContent({ onShowLanding }: { onShowLanding?: () => void }) {
   const [typeFilter, setTypeFilter] = useState<TaskType | 'ALL'>('ALL');
   const [page, setPage] = useState(1);
 
-  // TanStack Query: Fetch Tasks
+  // TanStack Query: Fetch Tasks (Scoped to user.id & role)
   const {
     data: tasksData,
     isLoading: isTasksLoading,
     refetch: refetchTasks,
   } = useQuery({
-    queryKey: ['tasks', search, statusFilter, typeFilter, page],
+    queryKey: ['tasks', user?.id, user?.role, search, statusFilter, typeFilter, page],
     queryFn: () =>
       taskService.getTasks({
         search: search || undefined,
@@ -92,12 +92,14 @@ function DashboardContent({ onShowLanding }: { onShowLanding?: () => void }) {
         sortBy: 'createdAt',
         sortOrder: 'desc',
       }),
+    enabled: Boolean(user?.id),
   });
 
-  // TanStack Query: Fetch Stats Summary
+  // TanStack Query: Fetch Stats Summary (Scoped to user.id & role)
   const { data: statsData } = useQuery({
-    queryKey: ['taskStats'],
+    queryKey: ['taskStats', user?.id, user?.role],
     queryFn: () => taskService.getStatsSummary(),
+    enabled: Boolean(user?.id),
     refetchInterval: 5000,
   });
 
