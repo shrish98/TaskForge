@@ -1,107 +1,167 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { AuthGuard } from '@/components/auth/AuthGuard';
 import { Navbar } from '@/components/layout/Navbar';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Footer } from '@/components/layout/Footer';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { CreateTaskModal } from '@/components/dashboard/CreateTaskModal';
+import { TaskLogModal } from '@/components/dashboard/TaskLogModal';
+import { TaskTable } from '@/components/dashboard/TaskTable';
+import { useSocket } from '@/hooks/useSocket';
+import {
+  taskService,
+  Task,
+  TaskStatus,
+  TaskType,
+  CreateTaskPayload,
+} from '@/services/task.service';
 import {
   ListTodo,
   CheckCircle2,
-  Clock,
   AlertCircle,
   PlayCircle,
   Plus,
-  ArrowUpRight,
   TrendingUp,
   Cpu,
   Layers,
+  RefreshCw,
 } from 'lucide-react';
 
 export default function HomePage() {
-  const [activeTab, setActiveTab] = useState('dashboard');
+  return (
+    <AuthGuard>
+      <DashboardContent />
+    </AuthGuard>
+  );
+}
 
-  const dummyUser = {
-    name: 'Demo Architect',
-    email: 'user@taskforge.ai',
-    role: 'ADMIN',
+function DashboardContent() {
+  const queryClient = useQueryClient();
+  const { isConnected } = useSocket();
+
+  // Component States
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [selectedTaskForLogs, setSelectedTaskForLogs] = useState<Task | null>(null);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<TaskStatus | 'ALL'>('ALL');
+  const [typeFilter, setTypeFilter] = useState<TaskType | 'ALL'>('ALL');
+  const [page, setPage] = useState(1);
+
+  // TanStack Query: Fetch Tasks
+  const {
+    data: tasksData,
+    isLoading: isTasksLoading,
+    refetch: refetchTasks,
+  } = useQuery({
+    queryKey: ['tasks', search, statusFilter, typeFilter, page],
+    queryFn: () =>
+      taskService.getTasks({
+        search: search || undefined,
+        status: statusFilter === 'ALL' ? undefined : statusFilter,
+        type: typeFilter === 'ALL' ? undefined : typeFilter,
+        page,
+        limit: 10,
+        sortBy: 'createdAt',
+        sortOrder: 'desc',
+      }),
+  });
+
+  // TanStack Query: Fetch Stats Summary
+  const { data: statsData } = useQuery({
+    queryKey: ['taskStats'],
+    queryFn: () => taskService.getStatsSummary(),
+    refetchInterval: 5000,
+  });
+
+  // Mutations
+  const createTaskMutation = useMutation({
+    mutationFn: (payload: CreateTaskPayload) => taskService.createTask(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['taskStats'] });
+    },
+  });
+
+  const retryTaskMutation = useMutation({
+    mutationFn: (taskId: string) => taskService.retryTask(taskId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['taskStats'] });
+    },
+  });
+
+  const deleteTaskMutation = useMutation({
+    mutationFn: (taskId: string) => taskService.deleteTask(taskId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['taskStats'] });
+    },
+  });
+
+  const handleCreateTask = async (payload: CreateTaskPayload) => {
+    await createTaskMutation.mutateAsync(payload);
   };
 
-  const sampleTasks = [
-    {
-      id: 'task-101',
-      title: 'Extract Text & Metadata from Invoice PDF',
-      type: 'FILE_PROCESSING',
-      status: 'COMPLETED' as const,
-      priority: 3,
-      progress: 100,
-      createdAt: '10 mins ago',
-    },
-    {
-      id: 'task-102',
-      title: 'Scrape E-Commerce Competitor Price Catalog',
-      type: 'WEB_SCRAPE',
-      status: 'PROCESSING' as const,
-      priority: 2,
-      progress: 65,
-      createdAt: '3 mins ago',
-    },
-    {
-      id: 'task-103',
-      title: 'Generate Quarterly Financial PDF Report',
-      type: 'REPORT_GENERATION',
-      status: 'PENDING' as const,
-      priority: 1,
-      progress: 0,
-      createdAt: 'Just now',
-    },
-    {
-      id: 'task-104',
-      title: 'Dispatch Batch Email Notifications to Subscribed Clients',
-      type: 'NOTIFICATION_DISPATCH',
-      status: 'FAILED' as const,
-      priority: 2,
-      progress: 25,
-      createdAt: '1 hour ago',
-    },
-  ];
+  const handleRetryTask = (taskId: string) => {
+    retryTaskMutation.mutate(taskId);
+  };
+
+  const handleDeleteTask = (taskId: string) => {
+    if (confirm('Are you sure you want to delete this task?')) {
+      deleteTaskMutation.mutate(taskId);
+    }
+  };
 
   return (
     <div className="flex min-h-screen flex-col bg-[#090d16] text-slate-100 selection:bg-indigo-500/30">
-      {/* Step 7 Layout - Top Navbar */}
+      {/* Top Navbar */}
       <Navbar />
 
       <div className="flex flex-1">
-        {/* Step 7 Layout - Left Navigation Sidebar */}
+        {/* Left Navigation Sidebar */}
         <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
 
-        {/* Main Content Area */}
+        {/* Main Content */}
         <main className="flex-1 p-6 lg:p-8 space-y-8 max-w-7xl mx-auto w-full">
           {/* Header Banner */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-800/80 pb-6">
             <div>
               <div className="flex items-center gap-2 mb-1">
-                <Badge variant="PROCESSING" pulse>
-                  Step 7 Verified
+                <Badge variant={isConnected ? 'COMPLETED' : 'FAILED'} pulse={isConnected}>
+                  {isConnected ? 'Socket.IO Real-Time Active' : 'Connecting Sockets...'}
                 </Badge>
-                <span className="text-xs text-slate-400">• App Router & Design System Ready</span>
+                <span className="text-xs text-slate-400">• BullMQ Async Queue Engine</span>
               </div>
               <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
-                Task Automation & Job Engine
+                Task Automation Dashboard
               </h1>
               <p className="text-sm text-slate-400 mt-1">
-                Real-time job queue metrics, worker concurrency, and live telemetry updates.
+                Live queue execution metrics, worker concurrency, and automated task logs.
               </p>
             </div>
 
             <div className="flex items-center gap-3">
-              <Button variant="secondary" size="md">
-                <Layers className="h-4 w-4" />
-                View API Schema
+              <Button
+                variant="secondary"
+                size="md"
+                onClick={() => refetchTasks()}
+                className="gap-1.5"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Refresh
               </Button>
-              <Button variant="primary" size="md">
+              <Button
+                variant="primary"
+                size="md"
+                onClick={() => setIsCreateModalOpen(true)}
+                className="gap-1.5"
+              >
                 <Plus className="h-4 w-4" />
                 Dispatch New Task
               </Button>
@@ -120,9 +180,9 @@ export default function HomePage() {
                 </div>
               </div>
               <div className="mt-3 flex items-baseline gap-2">
-                <span className="text-3xl font-bold text-white">42</span>
+                <span className="text-3xl font-bold text-white">{statsData?.total || 0}</span>
                 <span className="text-xs font-medium text-emerald-400 flex items-center gap-0.5">
-                  <TrendingUp className="h-3 w-3" /> +12% this week
+                  <TrendingUp className="h-3 w-3" /> Live
                 </span>
               </div>
             </Card>
@@ -130,15 +190,19 @@ export default function HomePage() {
             <Card className="relative overflow-hidden">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                  Active Workers
+                  Processing / Pending
                 </span>
                 <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
                   <PlayCircle className="h-4 w-4" />
                 </div>
               </div>
               <div className="mt-3 flex items-baseline gap-2">
-                <span className="text-3xl font-bold text-indigo-400">1 Jobs</span>
-                <span className="text-xs text-slate-400">Concurrency: 5</span>
+                <span className="text-3xl font-bold text-indigo-400">
+                  {(statsData?.processing || 0) + (statsData?.pending || 0)}
+                </span>
+                <span className="text-xs text-slate-400">
+                  {statsData?.processing || 0} active, {statsData?.pending || 0} queued
+                </span>
               </div>
             </Card>
 
@@ -152,8 +216,10 @@ export default function HomePage() {
                 </div>
               </div>
               <div className="mt-3 flex items-baseline gap-2">
-                <span className="text-3xl font-bold text-emerald-400">38</span>
-                <span className="text-xs text-slate-400">90.4% success rate</span>
+                <span className="text-3xl font-bold text-emerald-400">
+                  {statsData?.completed || 0}
+                </span>
+                <span className="text-xs text-slate-400">100% finished</span>
               </div>
             </Card>
 
@@ -167,89 +233,58 @@ export default function HomePage() {
                 </div>
               </div>
               <div className="mt-3 flex items-baseline gap-2">
-                <span className="text-3xl font-bold text-rose-400">3</span>
-                <span className="text-xs text-slate-400">Exponential backoff active</span>
+                <span className="text-3xl font-bold text-rose-400">{statsData?.failed || 0}</span>
+                <span className="text-xs text-slate-400">Max retries exceeded</span>
               </div>
             </Card>
           </div>
 
-          {/* Live Task Execution Queue Table */}
-          <Card>
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h3 className="text-base font-bold text-white flex items-center gap-2">
-                  <Cpu className="h-4 w-4 text-indigo-400" />
-                  Live Task Queue & Telemetry
-                </h3>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Synchronized with Redis BullMQ Queue & Socket.IO events.
-                </p>
-              </div>
-              <Button variant="ghost" size="sm">
-                View All <ArrowUpRight className="h-3.5 w-3.5 ml-1" />
-              </Button>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="border-b border-slate-800 text-slate-400 uppercase tracking-wider font-semibold">
-                    <th className="pb-3 px-3">Task Details</th>
-                    <th className="pb-3 px-3">Status</th>
-                    <th className="pb-3 px-3">Progress</th>
-                    <th className="pb-3 px-3">Priority</th>
-                    <th className="pb-3 px-3 text-right">Created</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/60">
-                  {sampleTasks.map((task) => (
-                    <tr key={task.id} className="hover:bg-slate-800/40 transition-colors">
-                      <td className="py-4 px-3">
-                        <div className="font-semibold text-slate-100">{task.title}</div>
-                        <div className="text-[11px] text-slate-400 font-mono mt-0.5">
-                          ID: {task.id} • {task.type}
-                        </div>
-                      </td>
-                      <td className="py-4 px-3">
-                        <Badge variant={task.status} />
-                      </td>
-                      <td className="py-4 px-3 min-w-[140px]">
-                        <div className="flex items-center gap-2">
-                          <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
-                            <div
-                              className={`h-full rounded-full transition-all duration-500 ${
-                                task.status === 'COMPLETED'
-                                  ? 'bg-emerald-500'
-                                  : task.status === 'FAILED'
-                                  ? 'bg-rose-500'
-                                  : 'bg-indigo-500 animate-pulse'
-                              }`}
-                              style={{ width: `${task.progress}%` }}
-                            />
-                          </div>
-                          <span className="font-mono text-[11px] text-slate-400 font-semibold">
-                            {task.progress}%
-                          </span>
-                        </div>
-                      </td>
-                      <td className="py-4 px-3 font-mono font-medium">
-                        <span className="rounded bg-slate-800 px-2 py-0.5 text-slate-300">
-                          P{task.priority}
-                        </span>
-                      </td>
-                      <td className="py-4 px-3 text-right text-slate-400 font-mono text-[11px]">
-                        {task.createdAt}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </Card>
+          {/* Interactive Task Queue Table */}
+          <TaskTable
+            tasks={tasksData?.tasks || []}
+            pagination={
+              tasksData?.pagination || { total: 0, page: 1, limit: 10, totalPages: 1 }
+            }
+            search={search}
+            onSearchChange={(val) => {
+              setSearch(val);
+              setPage(1);
+            }}
+            statusFilter={statusFilter}
+            onStatusFilterChange={(st) => {
+              setStatusFilter(st);
+              setPage(1);
+            }}
+            typeFilter={typeFilter}
+            onTypeFilterChange={(tp) => {
+              setTypeFilter(tp);
+              setPage(1);
+            }}
+            page={page}
+            onPageChange={(p) => setPage(p)}
+            onViewLogs={(task) => setSelectedTaskForLogs(task)}
+            onRetryTask={handleRetryTask}
+            onDeleteTask={handleDeleteTask}
+            isLoading={isTasksLoading}
+          />
         </main>
       </div>
 
-      {/* Step 7 Layout - Bottom Status Footer */}
+      {/* Modals */}
+      <CreateTaskModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onSubmit={handleCreateTask}
+        isLoading={createTaskMutation.isPending}
+      />
+
+      <TaskLogModal
+        task={selectedTaskForLogs}
+        isOpen={!!selectedTaskForLogs}
+        onClose={() => setSelectedTaskForLogs(null)}
+      />
+
+      {/* Footer */}
       <Footer />
     </div>
   );
