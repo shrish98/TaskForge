@@ -1,6 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+
+import { LandingPage } from '@/components/landing/LandingPage';
+import { useAppSelector } from '@/store/store';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AuthGuard } from '@/components/auth/AuthGuard';
 import { Navbar } from '@/components/layout/Navbar';
@@ -32,14 +35,19 @@ import {
   RefreshCw,
 } from 'lucide-react';
 
-import { LandingPage } from '@/components/landing/LandingPage';
-import { useAppSelector } from '@/store/store';
-
 export default function HomePage() {
+  const [isMounted, setIsMounted] = useState(false);
+  const [hasToken, setHasToken] = useState(false);
   const [showLanding, setShowLanding] = useState(false);
 
-  // Check if token exists in browser
-  const hasToken = typeof window !== 'undefined' ? Boolean(localStorage.getItem('accessToken')) : false;
+  useEffect(() => {
+    setIsMounted(true);
+    setHasToken(Boolean(localStorage.getItem('accessToken')));
+  }, []);
+
+  if (!isMounted) {
+    return <LandingPage />;
+  }
 
   if (!hasToken || showLanding) {
     return <LandingPage />;
