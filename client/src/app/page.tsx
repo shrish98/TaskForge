@@ -15,6 +15,9 @@ import { Button } from '@/components/ui/Button';
 import { CreateTaskModal } from '@/components/dashboard/CreateTaskModal';
 import { TaskLogModal } from '@/components/dashboard/TaskLogModal';
 import { TaskTable } from '@/components/dashboard/TaskTable';
+import { TelemetryView } from '@/components/dashboard/TelemetryView';
+import { AuditLogsView } from '@/components/dashboard/AuditLogsView';
+import { SystemConfigView } from '@/components/dashboard/SystemConfigView';
 import { useSocket } from '@/hooks/useSocket';
 import {
   taskService,
@@ -153,165 +156,176 @@ function DashboardContent({ onShowLanding }: { onShowLanding?: () => void }) {
 
         {/* Main Content */}
         <main className="flex-1 p-6 lg:p-8 space-y-8 max-w-7xl mx-auto w-full">
-          {/* Header Banner */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-800/80 pb-6">
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <Badge variant={isConnected ? 'COMPLETED' : 'FAILED'} pulse={isConnected}>
-                  {isConnected ? 'Socket.IO Real-Time Active' : 'Connecting Sockets...'}
-                </Badge>
-                <span className="text-xs text-slate-400">• BullMQ Async Queue Engine</span>
-              </div>
-              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
-                Task Automation Dashboard
-              </h1>
-              <p className="text-sm text-slate-400 mt-1">
-                Live queue execution metrics, worker concurrency, and automated task logs.
-              </p>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <Button
-                variant="secondary"
-                size="md"
-                onClick={() => refetchTasks()}
-                className="gap-1.5"
-              >
-                <RefreshCw className="h-4 w-4" />
-                Refresh
-              </Button>
-              <Button
-                variant="primary"
-                size="md"
-                onClick={() => setIsCreateModalOpen(true)}
-                className="gap-1.5"
-              >
-                <Plus className="h-4 w-4" />
-                Dispatch New Task
-              </Button>
-            </div>
-          </div>
-
-          {/* Metric Cards Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            <Card className="relative overflow-hidden">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                  Total Tasks
-                </span>
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-                  <ListTodo className="h-4 w-4" />
-                </div>
-              </div>
-              <div className="mt-3 flex items-baseline gap-2">
-                <span className="text-3xl font-bold text-white">{statsData?.total || 0}</span>
-                <span className="text-xs font-medium text-emerald-400 flex items-center gap-0.5">
-                  <TrendingUp className="h-3 w-3" /> Live
-                </span>
-              </div>
-            </Card>
-
-            <Card className="relative overflow-hidden">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                  Processing / Pending
-                </span>
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-                  <PlayCircle className="h-4 w-4" />
-                </div>
-              </div>
-              <div className="mt-3 flex items-baseline gap-2">
-                <span className="text-3xl font-bold text-indigo-400">
-                  {(statsData?.processing || 0) + (statsData?.pending || 0)}
-                </span>
-                <span className="text-xs text-slate-400">
-                  {statsData?.processing || 0} active, {statsData?.pending || 0} queued
-                </span>
-              </div>
-            </Card>
-
-            <Card className="relative overflow-hidden">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                  Completed
-                </span>
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                  <CheckCircle2 className="h-4 w-4" />
-                </div>
-              </div>
-              <div className="mt-3 flex items-baseline gap-2">
-                <span className="text-3xl font-bold text-emerald-400">
-                  {statsData?.completed || 0}
-                </span>
-                <span className="text-xs text-slate-400">100% finished</span>
-              </div>
-            </Card>
-
-            <Card className="relative overflow-hidden">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                  Failed Jobs
-                </span>
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/20">
-                  <AlertCircle className="h-4 w-4" />
-                </div>
-              </div>
-              <div className="mt-3 flex items-baseline gap-2">
-                <span className="text-3xl font-bold text-rose-400">{statsData?.failed || 0}</span>
-                <span className="text-xs text-slate-400">Max retries exceeded</span>
-              </div>
-            </Card>
-          </div>
-
-          {/* Admin Overview Mode Banner */}
-          {isAdmin && (
-            <div className="rounded-2xl border border-purple-500/30 bg-purple-500/10 p-4 text-xs text-purple-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-lg shadow-purple-500/5">
-              <div className="flex items-center gap-3">
-                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-purple-500/20 text-purple-300 font-bold border border-purple-500/30">
-                  🛡️
-                </div>
+          {activeTab === 'analytics' ? (
+            <TelemetryView statsData={statsData} />
+          ) : activeTab === 'audit' ? (
+            <AuditLogsView />
+          ) : activeTab === 'settings' ? (
+            <SystemConfigView />
+          ) : (
+            <>
+              {/* Header Banner */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-800/80 pb-6">
                 <div>
-                  <span className="font-bold uppercase tracking-wider text-purple-300">Global Admin Oversight Active</span>
-                  <p className="text-[11px] text-purple-300/80">
-                    You have global administrative visibility. Viewing, managing, and retrying tasks across all platform users.
+                  <div className="flex items-center gap-2 mb-1">
+                    <Badge variant={isConnected ? 'COMPLETED' : 'FAILED'} pulse={isConnected}>
+                      {isConnected ? 'Socket.IO Real-Time Active' : 'Connecting Sockets...'}
+                    </Badge>
+                    <span className="text-xs text-slate-400">• BullMQ Async Queue Engine</span>
+                  </div>
+                  <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
+                    {activeTab === 'tasks' ? 'Task Queue Management' : 'Task Automation Dashboard'}
+                  </h1>
+                  <p className="text-sm text-slate-400 mt-1">
+                    Live queue execution metrics, worker concurrency, and automated task logs.
                   </p>
                 </div>
-              </div>
-              <span className="rounded-full bg-purple-500/20 px-3 py-1 text-[10px] font-bold text-purple-300 border border-purple-500/40 shrink-0">
-                SYSTEM-WIDE ACCESS
-              </span>
-            </div>
-          )}
 
-          {/* Interactive Task Queue Table */}
-          <TaskTable
-            tasks={tasksData?.tasks || []}
-            pagination={
-              tasksData?.pagination || { total: 0, page: 1, limit: 10, totalPages: 1 }
-            }
-            search={search}
-            onSearchChange={(val) => {
-              setSearch(val);
-              setPage(1);
-            }}
-            statusFilter={statusFilter}
-            onStatusFilterChange={(st) => {
-              setStatusFilter(st);
-              setPage(1);
-            }}
-            typeFilter={typeFilter}
-            onTypeFilterChange={(tp) => {
-              setTypeFilter(tp);
-              setPage(1);
-            }}
-            page={page}
-            onPageChange={(p) => setPage(p)}
-            onViewLogs={(task) => setSelectedTaskForLogs(task)}
-            onRetryTask={handleRetryTask}
-            onDeleteTask={handleDeleteTask}
-            isLoading={isTasksLoading}
-            isAdmin={isAdmin}
-          />
+                <div className="flex items-center gap-3">
+                  <Button
+                    variant="secondary"
+                    size="md"
+                    onClick={() => refetchTasks()}
+                    className="gap-1.5"
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                    Refresh Queue
+                  </Button>
+
+                  <Button
+                    variant="primary"
+                    size="md"
+                    onClick={() => setIsCreateModalOpen(true)}
+                    className="gap-1.5 shadow-lg shadow-indigo-600/25"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Create Task
+                  </Button>
+                </div>
+              </div>
+
+              {/* Executive Overview Metric Cards (Dashboard Tab Only) */}
+              {activeTab === 'dashboard' && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <Card className="relative overflow-hidden">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                        Total Tasks
+                      </span>
+                      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                        <ListTodo className="h-4 w-4" />
+                      </div>
+                    </div>
+                    <div className="mt-3 flex items-baseline gap-2">
+                      <span className="text-3xl font-bold text-white">{statsData?.total || 0}</span>
+                      <span className="text-xs font-medium text-emerald-400 flex items-center gap-0.5">
+                        <TrendingUp className="h-3 w-3" /> Live
+                      </span>
+                    </div>
+                  </Card>
+
+                  <Card className="relative overflow-hidden">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                        Processing / Pending
+                      </span>
+                      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                        <PlayCircle className="h-4 w-4" />
+                      </div>
+                    </div>
+                    <div className="mt-3 flex items-baseline gap-2">
+                      <span className="text-3xl font-bold text-indigo-400">
+                        {(statsData?.processing || 0) + (statsData?.pending || 0)}
+                      </span>
+                      <span className="text-xs text-slate-400">
+                        {statsData?.processing || 0} active, {statsData?.pending || 0} queued
+                      </span>
+                    </div>
+                  </Card>
+
+                  <Card className="relative overflow-hidden">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                        Completed
+                      </span>
+                      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                        <CheckCircle2 className="h-4 w-4" />
+                      </div>
+                    </div>
+                    <div className="mt-3 flex items-baseline gap-2">
+                      <span className="text-3xl font-bold text-emerald-400">{statsData?.completed || 0}</span>
+                      <span className="text-xs text-slate-400">100% finished</span>
+                    </div>
+                  </Card>
+
+                  <Card className="relative overflow-hidden">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                        Failed Jobs
+                      </span>
+                      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                        <AlertCircle className="h-4 w-4" />
+                      </div>
+                    </div>
+                    <div className="mt-3 flex items-baseline gap-2">
+                      <span className="text-3xl font-bold text-rose-400">{statsData?.failed || 0}</span>
+                      <span className="text-xs text-slate-400">Max retries exceeded</span>
+                    </div>
+                  </Card>
+                </div>
+              )}
+
+              {/* Admin Overview Mode Banner */}
+              {isAdmin && (
+                <div className="rounded-2xl border border-purple-500/30 bg-purple-500/10 p-4 text-xs text-purple-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-lg shadow-purple-500/5">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-purple-500/20 text-purple-300 font-bold border border-purple-500/30">
+                      🛡️
+                    </div>
+                    <div>
+                      <span className="font-bold uppercase tracking-wider text-purple-300">Global Admin Oversight Active</span>
+                      <p className="text-[11px] text-purple-300/80">
+                        You have global administrative visibility. Viewing, managing, and retrying tasks across all platform users.
+                      </p>
+                    </div>
+                  </div>
+                  <span className="rounded-full bg-purple-500/20 px-3 py-1 text-[10px] font-bold text-purple-300 border border-purple-500/40 shrink-0">
+                    SYSTEM-WIDE ACCESS
+                  </span>
+                </div>
+              )}
+
+              {/* Interactive Task Queue Table */}
+              <TaskTable
+                tasks={tasksData?.tasks || []}
+                pagination={
+                  tasksData?.pagination || { total: 0, page: 1, limit: 10, totalPages: 1 }
+                }
+                search={search}
+                onSearchChange={(val) => {
+                  setSearch(val);
+                  setPage(1);
+                }}
+                statusFilter={statusFilter}
+                onStatusFilterChange={(st) => {
+                  setStatusFilter(st);
+                  setPage(1);
+                }}
+                typeFilter={typeFilter}
+                onTypeFilterChange={(tp) => {
+                  setTypeFilter(tp);
+                  setPage(1);
+                }}
+                page={page}
+                onPageChange={(p) => setPage(p)}
+                onViewLogs={(task) => setSelectedTaskForLogs(task)}
+                onRetryTask={handleRetryTask}
+                onDeleteTask={handleDeleteTask}
+                isLoading={isTasksLoading}
+                isAdmin={isAdmin}
+              />
+            </>
+          )}
         </main>
       </div>
 
