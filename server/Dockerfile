@@ -35,4 +35,4 @@ COPY prisma ./prisma/
 
 EXPOSE 5000
 
-CMD ["node", "dist/index.js"]
+CMD ["sh", "-c", "npx prisma db push && node dist/prisma/seed.js && node dist/index.js"]
