@@ -243,6 +243,23 @@ npm run build
 
 ---
 
+## 💡 Engineering Decisions, Assumptions & Trade-Offs
+
+### 1. Architectural Decisions
+- **Decoupled Worker Process**: Separated the Express API Gateway (`index.ts`) from the BullMQ Queue Processor (`worker.ts`) to ensure background tasks do not block CPU execution or thread event loops during heavy file/data computations.
+- **Repository Pattern**: Decoupled Prisma ORM database queries into dedicated repositories (`task.repository.ts`, `auth.repository.ts`) to adhere to SOLID principles and simplify unit test mocking.
+- **User-Scoped Query Keys**: Embedded `user.id` and `user.role` into React Query cache keys to ensure instant state invalidation when switching sessions without requiring manual page reloads.
+
+### 2. Key Assumptions
+- **Redis Availability**: Assumed Redis 7 is available for both BullMQ task queue storage and Socket.IO Pub/Sub adapter broadcasting.
+- **Task Payload Storage**: Assumed JSON payload format for task parameters (e.g., URLs, file references, export options).
+
+### 3. Trade-Offs & Future Improvements
+- **Blob Storage**: Currently simulates file processing by returning download URLs. Production implementation would integrate AWS S3 / Cloudflare R2 presigned URLs.
+- **Dead Letter Queue (DLQ)**: Tasks that fail after max 3 retries are assigned status `FAILED` and recorded in `TaskLog`. Future enhancements can add a dedicated DLQ inspection UI.
+
+---
+
 ## 📜 License
 
 Distributed under the MIT License. See `LICENSE` for details.
