@@ -1,66 +1,26 @@
 # 🚀 TaskForge - Distributed Task Automation & Real-Time Job Processing Engine
 
-> Production-ready **Micro-SaaS Asynchronous Task Processing Platform** built with Node.js, Express, TypeScript, BullMQ, Redis, PostgreSQL, Prisma ORM, Socket.IO WebSockets, and Next.js 14 (App Router).
+[![CI/CD Pipeline](https://github.com/shrish98/TaskForge/actions/workflows/ci.yml/badge.svg)](https://github.com/shrish98/TaskForge/actions/workflows/ci.yml)
+![Node.js Version](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen)
+![Next.js Version](https://img.shields.io/badge/next.js-v15-blue)
+![TypeScript](https://img.shields.io/badge/typescript-v5-blue)
+![Docker](https://img.shields.io/badge/docker-ready-cyan)
+![License](https://img.shields.io/badge/license-MIT-green)
+
+> Production-ready **Micro-SaaS Asynchronous Task Processing Platform** built with Node.js, Express, TypeScript, BullMQ, Redis, PostgreSQL, Prisma ORM, Socket.IO WebSockets, and Next.js 15 (App Router).
 
 ---
 
 ## 🌟 Executive Overview
 
-TaskForge solves the challenge of handling heavy or time-consuming background operations (such as file conversion, OCR extraction, web scraping, PDF report generation, and batch email dispatching) without blocking HTTP API request threads.
+TaskForge solves the challenge of handling heavy or time-consuming background operations (such as image compression, video transcoding, OCR extraction, web scraping, PDF report generation, and batch email dispatching) without blocking HTTP API request threads.
 
 ### Key Capabilities:
-- **Non-Blocking Architecture**: Express API Gateway offloads background workloads to dedicated BullMQ Redis Workers.
-- **Real-Time Telemetry**: Socket.IO WebSockets broadcast live job progress (`0%` ➔ `100%`), state transitions (`PENDING` ➔ `PROCESSING` ➔ `COMPLETED` / `FAILED`), and audit logs directly to connected user rooms.
-- **Enterprise Security**: Dual-token JWT Authentication (15-min Access Tokens + 7-day Refresh Tokens stored in Redis & DB), password hashing with `bcrypt`, and Role-Based Access Control (`USER` / `ADMIN`).
-- **Resilient Execution**: Automatic exponential backoff retries (max 3 attempts), delay scheduling, priority queueing (P1–P3), and error handling with full audit log trails (`TaskLog`).
-- **Production Dashboard**: Built with Next.js 14 App Router, Redux Toolkit for global user state, TanStack Query v5 for server state caching, and Tailwind CSS glassmorphic UI.
-
----
-
-## 🏗️ Architecture & Component Directory
-
-```
-taskforge/
-├── .github/
-│   └── workflows/
-│       └── ci.yml             # Automated GitHub Actions CI/CD Pipeline
-├── docker-compose.yml         # Multi-container orchestrator (Postgres, Redis, Server, Worker, Client)
-├── .env.example               # Central environment variables schema
-├── README.md                  # Comprehensive System Documentation
-├── server/                    # Express API Gateway & BullMQ Async Worker
-│   ├── Dockerfile             # Multi-stage API Gateway container image
-│   ├── Dockerfile.worker      # Standalone BullMQ Worker container image
-│   ├── package.json
-│   ├── tsconfig.json
-│   ├── jest.config.js
-│   ├── prisma/
-│   │   ├── schema.prisma      # PostgreSQL Schema (User, Task, RefreshToken, TaskLog)
-│   │   └── seed.ts            # Automated Database Seeding Script
-│   └── src/
-│       ├── index.ts           # Express API & Socket.IO Gateway Entrypoint
-│       ├── worker.ts          # Standalone Queue Worker Process Entrypoint
-│       ├── config/            # Redis & Environment Configurations
-│       ├── controllers/       # HTTP Request Handlers (Auth, Task)
-│       ├── middlewares/       # AuthGuard, RateLimiter, ErrorHandler
-│       ├── queues/            # BullMQ Task Queue & Processor Simulations
-│       ├── repositories/      # Decoupled Prisma Data Access Layer
-│       ├── routes/            # Express Endpoint Routers
-│       ├── services/          # Business Logic (Task, Auth)
-│       ├── socket/            # Socket.IO Real-Time Engine & User Rooms
-│       └── utils/             # ApiError, ApiResponse, Logger, TokenUtils
-└── client/                    # Next.js 14 Micro-SaaS Frontend
-    ├── Dockerfile             # Multi-stage Next.js standalone container image
-    ├── package.json
-    ├── tailwind.config.ts
-    └── src/
-        ├── app/               # Next.js 14 App Router (/login, /register, /)
-        ├── components/        # Glassmorphic UI Primitives, Navbar, Sidebar, TaskTable, Modals
-        ├── hooks/             # Custom useSocket Real-Time Hook
-        ├── lib/               # Axios Instance with Auto Refresh Interceptor
-        ├── providers/         # Redux + TanStack Query Combined Provider
-        ├── services/          # Client API Services (Auth, Task)
-        └── store/             # Redux Toolkit Store & Auth Slice
-```
+- ⚡ **Non-Blocking Architecture**: Express API Gateway offloads heavy workloads to dedicated Redis-backed BullMQ Workers.
+- 🔄 **Real-Time Telemetry**: Socket.IO WebSockets broadcast live job progress (`0%` ➔ `100%`), state transitions (`PENDING` ➔ `PROCESSING` ➔ `COMPLETED` / `FAILED`), and audit logs directly to connected user browser sessions without polling.
+- 🛡️ **Enterprise Security**: Dual-token JWT Authentication (15-min Access Tokens + 7-day Refresh Tokens stored in Redis & DB), password hashing with `bcrypt`, and Role-Based Access Control (`USER` / `ADMIN`).
+- 🔄 **Resilient Execution**: Automatic exponential backoff retries (max 3 attempts), delay scheduling, priority queueing (P1–P4), and step-by-step audit log trails (`TaskLog`).
+- 🎨 **Executive UI & SaaS Landing Page**: Next.js 15 App Router frontend with a high-conversion SaaS product landing page, glassmorphic dark theme (`#090d16`), Redux Toolkit global state, TanStack Query v5 cache management, and 5 interactive sidebar telemetry views.
 
 ---
 
@@ -68,60 +28,138 @@ taskforge/
 
 | Layer | Technology | Key Function / Role |
 | :--- | :--- | :--- |
-| **Frontend Framework** | Next.js 14 (App Router) | Server-Side Rendering, Client Component Routing, Optimization |
+| **Frontend Framework** | Next.js 15 (App Router) | Server Component SSR, Client Hydration, Routing, SaaS Landing Page |
 | **Global State** | Redux Toolkit | User session management, token persistence |
-| **Server State** | TanStack Query v5 | Data fetching, background refetching, cache invalidation |
-| **Styling** | Tailwind CSS + Lucide | Dark theme palette (`#090d16`), glassmorphism, micro-animations |
-| **Backend Framework** | Express.js & Node.js | REST API Gateway, Routing, Socket Server Host |
+| **Server State** | TanStack Query v5 | Data fetching, background refetching, user-scoped cache keys |
+| **Styling** | Tailwind CSS + Lucide Icons | Dark theme palette (`#090d16`), glassmorphism, micro-animations |
+| **Backend Framework** | Express.js & Node.js 20 | REST API Gateway, Routing, Socket Server Host |
 | **Language** | TypeScript 5 | Strict type safety across client and server |
-| **Database & ORM** | PostgreSQL 16 & Prisma | Relational entity storage, indexes, migrations, type-safe queries |
+| **Database & ORM** | PostgreSQL 16 & Prisma | Relational entity storage, indexes, schema migrations, type-safe queries |
 | **Async Queue** | Redis 7 & BullMQ | Asynchronous job queues, workers, delayed execution, backoff retries |
 | **Real-Time** | Socket.IO | WebSockets engine emitting live progress % and task status updates |
-| **Security** | JWT + bcrypt | Dual-token authentication with Redis refresh token invalidation |
+| **Security** | JWT + bcrypt | Dual-token authentication with Redis refresh token invalidation & RBAC |
 | **DevOps & Testing** | Docker & GitHub Actions | Multi-container orchestration, Jest unit testing, CI build validation |
 
 ---
 
-## ⚡ Quick Start with Docker
+## 🚀 Quick Start Guide (Testing Locally)
 
-Ensure you have [Docker](https://www.docker.com/) installed.
-
-```bash
-# 1. Clone the repository
-git clone https://github.com/shrish98/taskforge.git
-cd taskforge
-
-# 2. Copy environment configuration
-cp .env.example .env
-
-# 3. Spin up all 5 microservice containers (Postgres, Redis, Server, Worker, Client)
-docker compose up --build -d
-```
-
-### Access Local Services:
-- 🌐 **Next.js Frontend Dashboard**: `http://localhost:3000`
-- ⚙️ **Express API Gateway**: `http://localhost:5000/api/v1`
-- 🟢 **API Gateway Health Check**: `http://localhost:5000/health`
-- 🐘 **PostgreSQL Database**: `localhost:5432`
-- 🔴 **Redis Cache & Queue**: `localhost:6379`
+Follow either **Option A** (Standard Local Dev Setup) or **Option B** (1-Command Docker Setup) to test TaskForge on your local machine.
 
 ---
 
-## 🗝️ Default Seed Credentials
+### Option A: Standard Local Setup (Recommended for Developers)
 
-After running database migrations/seeding (`npm run prisma:seed` in `server`), use these credentials on the Login page:
+#### 1. System Requirements
+- [Node.js v20+](https://nodejs.org/)
+- [Docker Desktop](https://www.docker.com/) (running in background)
+- Git
 
-| User Role | Email | Password | Access Privileges |
+#### 2. Clone Repository & Install Dependencies
+```bash
+# Clone repository
+git clone https://github.com/shrish98/TaskForge.git
+cd TaskForge
+
+# Install root monorepo runner dependencies
+npm install
+```
+
+#### 3. Start PostgreSQL & Redis Containers
+Ensure Docker Desktop is open, then start the containerized databases:
+```bash
+docker compose up postgres redis -d
+```
+*This starts PostgreSQL on `localhost:5432` and Redis on `localhost:6379`.*
+
+#### 4. Run Database Schema Migrations & Seed Users (First Time Only)
+Run the following to initialize the PostgreSQL schema and populate demo accounts:
+```bash
+cd server
+npx prisma migrate dev --name init
+npm run prisma:seed
+cd ..
+```
+
+#### 5. Start All Application Services with 1 Command
+From the root directory, run:
+```bash
+npm run dev
+```
+
+*This single command starts all 3 application services concurrently using `concurrently`:*
+- 🌐 **Client (Next.js)**: `http://localhost:3000`
+- ⚡ **Server (Express API)**: `http://localhost:5000`
+- ⚙️ **Worker (BullMQ Task Processor)**: Running background queue loop
+
+---
+
+### Option B: 1-Command Docker Setup (100% Containerized)
+
+If you don't want to install Node.js dependencies locally and want Docker to run the entire stack:
+
+```bash
+git clone https://github.com/shrish98/TaskForge.git
+cd TaskForge
+docker compose up --build
+```
+
+*Docker Compose will build and orchestrate all 5 microservice containers (Postgres, Redis, Server API, Worker Process, and Client Dashboard) automatically!*
+
+---
+
+## 🧪 How to Test Features Step-by-Step
+
+Once `npm run dev` is running, open **[`http://localhost:3000`](http://localhost:3000)** in your browser to test the platform:
+
+### 1. ✨ Explore the SaaS Landing Page
+- Open `http://localhost:3000` when signed out.
+- Experience the product landing page featuring a live interactive worker terminal simulation, telemetry statistics, code integration tabs, and developer FAQs.
+
+### 2. 📝 Register a New User Account
+- Click **Get Started Free** or navigate to `http://localhost:3000/register`.
+- Create a new account with your name, email, and password.
+
+### 3. 👤 Test Asynchronous Task Dispatching & Real-Time WebSockets
+- Sign in as **Demo User** (`user@taskforge.ai` / `UserPassword123!`).
+- Click the indigo **`+ Create Task`** button in the top right.
+- Fill out the form:
+  - **Task Title**: `Generate Q3 Sales Invoice`
+  - **Task Type**: `REPORT_GENERATION` (or `FILE_PROCESSING`, `DATA_EXPORT`, `WEB_SCRAPE`, `NOTIFICATION_DISPATCH`)
+  - **Priority**: `P2 - High Priority`
+- Click **`Dispatch Task`**.
+- **Watch Live Progress**: Your task immediately appears in the queue. Observe the status shift live (`PENDING` ➔ `PROCESSING` ➔ `COMPLETED`) and the progress bar fill from **`0%` to `100%`** in real time via Socket.IO WebSockets!
+- **View Execution Audit Logs**: Click the **Eye (View Logs)** icon in the task row to inspect step-by-step audit logs and output payload URLs.
+
+### 4. 🛡️ Test Admin Multi-Tenant Oversight
+- Sign out and sign in with the **Admin Account** (`admin@taskforge.ai` / `AdminPassword123!`).
+- Notice the purple **"Global Admin Oversight Active"** banner.
+- As an Admin, you gain global visibility to view tasks created by **all users** across the platform, complete with a dedicated **Task Owner** column.
+- Click **Retry** on any failed job across system queues.
+
+### 5. 📊 Test Interactive Sidebar Views
+Click through the left navigation menu:
+- 📊 **Dashboard**: Executive metric cards & interactive Task Queue table.
+- 📋 **Task Queue**: Full-width focused task management table.
+- ⚡ **BullMQ Telemetry**: Live worker pool load distribution graph, Redis transport latency (< 1.8ms), memory stats, and operations/sec metrics.
+- 📜 **Task Logs**: Searchable audit console with level filters (`ALL`, `INFO`, `WARN`, `ERROR`).
+- ⚙️ **System Config**: Queue settings, worker concurrency thread sliders, and infrastructure health parameters.
+
+---
+
+## 🗝️ Default Pre-Seeded Accounts
+
+| Account Role | Email Address | Password | Access Privileges |
 | :--- | :--- | :--- | :--- |
-| **Demo User** | `user@taskforge.ai` | `UserPassword123!` | View & manage personal tasks |
-| **Admin User** | `admin@taskforge.ai` | `AdminPassword123!` | Full system metrics, view & control all workspace tasks |
+| 👤 **Demo User** | `user@taskforge.ai` | `UserPassword123!` | Personal queue isolation, create/manage own background tasks |
+| 🛡️ **Admin User** | `admin@taskforge.ai` | `AdminPassword123!` | System-wide access, global metrics, view/retry all user tasks |
 
 ---
 
 ## 📡 API Reference Endpoint Summary
 
 ### Authentication Routes (`/api/v1/auth`)
-- `POST /api/v1/auth/register`: Create new user account.
+- `POST /api/v1/auth/register`: Create a new user account.
 - `POST /api/v1/auth/login`: Authenticate credentials & receive Access + Refresh tokens.
 - `POST /api/v1/auth/refresh-token`: Refresh Access Token using valid Refresh Token.
 - `POST /api/v1/auth/logout`: Revoke Refresh Token & invalidate Redis session.
@@ -129,33 +167,82 @@ After running database migrations/seeding (`npm run prisma:seed` in `server`), u
 
 ### Task Queue Routes (`/api/v1/tasks`)
 - `POST /api/v1/tasks`: Dispatch new background task (Supports scheduling & JSON payload).
-- `GET /api/v1/tasks`: Paginated list of tasks (Supports `search`, `status`, `type`, `page`, `limit`, `sortBy`).
+- `GET /api/v1/tasks`: User-scoped or Admin-global paginated task list (Supports `search`, `status`, `type`, `page`, `limit`).
 - `GET /api/v1/tasks/:id`: Fetch single task details with execution audit logs (`TaskLog`).
 - `PATCH /api/v1/tasks/:id`: Update task parameters before processing.
 - `DELETE /api/v1/tasks/:id`: Cancel & delete task from database.
 - `POST /api/v1/tasks/:id/retry`: Re-queue a `FAILED` task for background worker retry.
-- `GET /api/v1/tasks/stats/summary`: Aggregate counts for dashboard metric cards.
+- `GET /api/v1/tasks/stats/summary`: Aggregate metrics for dashboard cards.
+
+---
+
+## 🏗️ Project Directory Structure
+
+```
+TaskForge/
+├── .github/
+│   └── workflows/
+│       └── ci.yml             # Automated GitHub Actions CI/CD Pipeline
+├── docker-compose.yml         # Multi-container orchestrator (Postgres, Redis, Server, Worker, Client)
+├── package.json               # Root monorepo runner with concurrently & clean scripts
+├── README.md                  # System Documentation
+├── server/                    # Express API Gateway & BullMQ Async Worker
+│   ├── Dockerfile             # API Gateway container image
+│   ├── Dockerfile.worker      # BullMQ Worker container image
+│   ├── package.json
+│   ├── tsconfig.json
+│   ├── jest.config.js
+│   ├── prisma/
+│   │   ├── schema.prisma      # PostgreSQL Schema (User, Task, RefreshToken, TaskLog)
+│   │   └── seed.ts            # Database Seeding Script
+│   └── src/
+│       ├── index.ts           # Express API & Socket.IO Entrypoint
+│       ├── worker.ts          # Standalone Queue Worker Entrypoint
+│       ├── config/            # Database & Redis Configurations
+│       ├── controllers/       # HTTP Request Handlers
+│       ├── middlewares/       # AuthGuard, RateLimiter, ErrorHandler
+│       ├── queues/            # BullMQ Task Queue & Processor Simulations
+│       ├── repositories/      # Decoupled Prisma Data Access Layer
+│       ├── routes/            # Express Endpoint Routers
+│       ├── services/          # Business Logic (Task, Auth)
+│       └── socket/            # Socket.IO Real-Time Engine
+└── client/                    # Next.js 15 Micro-SaaS Frontend
+    ├── Dockerfile             # Next.js standalone container image
+    ├── package.json
+    └── src/
+        ├── app/               # Next.js 15 App Router (/login, /register, /)
+        ├── components/        # Glassmorphic UI Primitives, LandingPage, Telemetry, AuditLogs, Config
+        ├── hooks/             # Custom useSocket Real-Time Hook
+        ├── lib/               # Axios Instance with Refresh Interceptor
+        ├── providers/         # Redux + TanStack Query Combined Provider
+        └── store/             # Redux Toolkit Store & Auth Slice
+```
 
 ---
 
 ## 🔄 CI/CD Pipeline & Automated Testing
 
-This repository includes a GitHub Actions Workflow ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) configured to:
-1. Spin up isolated PostgreSQL 16 and Redis 7 test containers in GitHub runners.
-2. Run backend TypeScript type check (`tsc --noEmit`) and Jest unit test suite (`npm test`).
-3. Run Next.js frontend compilation & production build check (`npm run build`).
-4. Validate Docker Compose multi-container build integrity.
+This repository includes a GitHub Actions Workflow ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) that automatically:
+1. Runs backend TypeScript type checking (`npx tsc --noEmit`) and Jest unit test suite (`npm test`).
+2. Runs Next.js frontend compilation & production build verification (`npm run build`).
+3. Validates Docker Compose container build integrity.
 
-To run tests locally:
+To execute tests and verification locally:
 ```bash
-# Backend unit tests
+# Run backend Jest unit tests
 cd server
 npm test
 
-# Backend type check
+# Run backend TypeScript typecheck
 npx tsc --noEmit
 
-# Frontend production build
+# Run frontend production build
 cd ../client
 npm run build
 ```
+
+---
+
+## 📜 License
+
+Distributed under the MIT License. See `LICENSE` for details.
