@@ -11,6 +11,7 @@ import { errorHandler } from './middlewares/error.middleware.js';
 import { apiRateLimiter } from './middlewares/rateLimiter.middleware.js';
 import { initSocketServer } from './socket/socket.server.js';
 import { logger } from './utils/logger.js';
+import './worker.js';
 
 import path from 'path';
 
