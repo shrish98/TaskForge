@@ -218,120 +218,127 @@ export const taskWorker = new Worker('task_queue', async (job) => {
       </header>
 
       {/* Hero Section */}
-      <section className="relative pt-16 pb-20 md:pt-24 md:pb-32 px-6 max-w-7xl mx-auto">
-        <div className="text-center max-w-4xl mx-auto space-y-6">
-          {/* Real-Time Engine Badge */}
-          <div className="inline-flex items-center gap-2 rounded-full border border-indigo-500/30 bg-indigo-500/10 px-4 py-1.5 text-xs font-semibold text-indigo-300 backdrop-blur-md shadow-inner">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
-            </span>
-            <span>Real-Time BullMQ + Socket.IO Distributed Architecture</span>
-          </div>
-
-          {/* Main Hero Headline */}
-          <h1 className="text-4xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight leading-[1.1] text-white">
-            High-Performance <br />
-            <span className="bg-gradient-to-r from-indigo-400 via-purple-300 to-amber-300 bg-clip-text text-transparent">
-              Async Job Processing Engine
-            </span>
-          </h1>
-
-          {/* Hero Subtitle */}
-          <p className="text-base sm:text-lg text-slate-400 max-w-2xl mx-auto leading-relaxed">
-            Power your background queues, scheduled tasks, and heavy worker processing with Redis persistence, automatic retry policies, and live WebSocket telemetry metrics.
-          </p>
-
-          {/* Hero Action Buttons */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
-            <Link
-              href="/register"
-              className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 px-8 py-4 text-sm font-bold text-white shadow-xl shadow-indigo-600/30 hover:shadow-indigo-600/50 hover:scale-[1.03] transition-all"
-            >
-              <Sparkles className="h-4 w-4" />
-              <span>Launch Demo Engine</span>
-              <ArrowRight className="h-4 w-4" />
-            </Link>
-            <Link
-              href="/login"
-              className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-2xl border border-slate-800 bg-slate-900/60 px-8 py-4 text-sm font-semibold text-slate-300 hover:text-white hover:bg-slate-800/60 transition-all"
-            >
-              <Lock className="h-4 w-4 text-indigo-400" />
-              <span>Sign In with Demo Account</span>
-            </Link>
-          </div>
-        </div>
-
-        {/* Live Interactive Telemetry Preview Mockup */}
-        <div className="mt-16 relative max-w-5xl mx-auto rounded-3xl border border-slate-800/80 bg-slate-950/80 p-4 sm:p-6 shadow-2xl backdrop-blur-2xl overflow-hidden shadow-indigo-500/10">
-          {/* Top Mockup Header Bar */}
-          <div className="flex items-center justify-between border-b border-slate-800/80 pb-4 mb-6">
-            <div className="flex items-center gap-2">
-              <div className="h-3 w-3 rounded-full bg-rose-500/80" />
-              <div className="h-3 w-3 rounded-full bg-amber-500/80" />
-              <div className="h-3 w-3 rounded-full bg-emerald-500/80" />
-              <span className="ml-2 font-mono text-xs text-slate-500">taskforge-live-telemetry.worker.internal</span>
+      <section className="relative pt-12 pb-20 md:pt-16 md:pb-28 px-6 max-w-7xl mx-auto">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
+          {/* Hero Left Content (Main Heading Section - 7/12 width) */}
+          <div className="lg:col-span-7 text-left space-y-6">
+            {/* Real-Time Engine Badge */}
+            <div className="inline-flex items-center gap-2 rounded-full border border-indigo-500/30 bg-indigo-500/10 px-3.5 py-1.5 text-xs font-semibold text-indigo-300 backdrop-blur-md shadow-inner">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+              </span>
+              <span>Real-Time BullMQ + Socket.IO Distributed Architecture</span>
             </div>
 
-            <div className="flex items-center gap-2">
-              <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="font-mono text-[11px] font-semibold text-emerald-400">STATUS: ACTIVE WORKER POOL</span>
+            {/* Main Hero Headline */}
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight leading-[1.12] text-white">
+              High-Performance <br />
+              <span className="bg-gradient-to-r from-indigo-400 via-purple-300 to-amber-300 bg-clip-text text-transparent">
+                Async Job Processing Engine
+              </span>
+            </h1>
+
+            {/* Hero Subtitle */}
+            <p className="text-base sm:text-lg text-slate-400 leading-relaxed max-w-2xl">
+              Power your background queues, scheduled tasks, and heavy worker processing with Redis persistence, automatic retry policies, and live WebSocket telemetry metrics.
+            </p>
+
+            {/* Hero Action Buttons */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-start gap-4 pt-2">
+              <Link
+                href="/register"
+                className="flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 px-7 py-4 text-sm font-bold text-white shadow-xl shadow-indigo-600/30 hover:shadow-indigo-600/50 hover:scale-[1.02] transition-all"
+              >
+                <Sparkles className="h-4 w-4" />
+                <span>Launch Demo Engine</span>
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+              <Link
+                href="/login"
+                className="flex items-center justify-center gap-2 rounded-2xl border border-slate-800 bg-slate-900/60 px-7 py-4 text-sm font-semibold text-slate-300 hover:text-white hover:bg-slate-800/60 transition-all"
+              >
+                <Lock className="h-4 w-4 text-indigo-400" />
+                <span>Sign In with Demo Account</span>
+              </Link>
             </div>
           </div>
 
-          {/* Interactive Live Worker Status Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <div className="rounded-2xl border border-slate-800/80 bg-slate-900/50 p-4">
-              <div className="flex items-center justify-between text-xs text-slate-400">
-                <span>Active Queue Concurrency</span>
-                <Cpu className="h-4 w-4 text-indigo-400" />
+          {/* Live Interactive Telemetry Preview Mockup (Adjacent Right Column - 5/12 width) */}
+          <div className="lg:col-span-5 relative w-full rounded-3xl border border-slate-800/80 bg-slate-950/80 p-4 sm:p-5 shadow-2xl backdrop-blur-2xl overflow-hidden shadow-indigo-500/10">
+            {/* Top Mockup Header Bar */}
+            <div className="flex items-center justify-between border-b border-slate-800/80 pb-3 mb-4">
+              <div className="flex items-center gap-2">
+                <div className="h-3 w-3 rounded-full bg-rose-500/80" />
+                <div className="h-3 w-3 rounded-full bg-amber-500/80" />
+                <div className="h-3 w-3 rounded-full bg-emerald-500/80" />
+                <span className="ml-2 font-mono text-[11px] text-slate-500 truncate max-w-[160px] sm:max-w-none">
+                  taskforge-telemetry.internal
+                </span>
               </div>
-              <div className="text-2xl font-extrabold text-white mt-2">5 Workers Running</div>
-              <div className="text-[11px] text-emerald-400 mt-1 font-mono">100% Worker Efficiency</div>
-            </div>
 
-            <div className="rounded-2xl border border-slate-800/80 bg-slate-900/50 p-4">
-              <div className="flex items-center justify-between text-xs text-slate-400">
-                <span>Simulated Job Progress</span>
-                <Activity className="h-4 w-4 text-emerald-400" />
-              </div>
-              <div className="text-2xl font-extrabold text-emerald-400 mt-2">{demoProgress}% Complete</div>
-              <div className="w-full bg-slate-800 rounded-full h-1.5 mt-2 overflow-hidden">
-                <div
-                  className="bg-emerald-500 h-full transition-all duration-500"
-                  style={{ width: `${demoProgress}%` }}
-                />
+              <div className="flex items-center gap-1.5 shrink-0">
+                <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="font-mono text-[10px] font-semibold text-emerald-400">
+                  ACTIVE POOL
+                </span>
               </div>
             </div>
 
-            <div className="rounded-2xl border border-slate-800/80 bg-slate-900/50 p-4">
-              <div className="flex items-center justify-between text-xs text-slate-400">
-                <span>Redis Transport Latency</span>
-                <Zap className="h-4 w-4 text-amber-400" />
+            {/* Interactive Live Worker Status Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 mb-4">
+              <div className="rounded-2xl border border-slate-800/80 bg-slate-900/50 p-3">
+                <div className="flex items-center justify-between text-[10px] text-slate-400">
+                  <span>Queue Concurrency</span>
+                  <Cpu className="h-3.5 w-3.5 text-indigo-400" />
+                </div>
+                <div className="text-lg font-extrabold text-white mt-1">5 Workers</div>
+                <div className="text-[10px] text-emerald-400 mt-0.5 font-mono">100% Efficiency</div>
               </div>
-              <div className="text-2xl font-extrabold text-amber-300 mt-2">&lt; 1.8 ms</div>
-              <div className="text-[11px] text-slate-400 mt-1 font-mono">Socket.IO Event Stream Active</div>
-            </div>
-          </div>
 
-          {/* Terminal Logs Simulation */}
-          <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 font-mono text-xs text-slate-300 space-y-2">
-            <div className="flex items-center gap-2 text-indigo-400">
-              <Terminal className="h-4 w-4" />
-              <span className="font-bold">TaskForge Execution Stream Terminal</span>
-            </div>
-            <div className="text-slate-400">[19:42:01] ⚡ Worker initialized with BullMQ Redis connection on port 6379</div>
-            <div className="text-indigo-300">
-              [19:42:05] 🔄 [Worker] Processing Job #task_8921 (Type: REPORT_GENERATION, Priority: 3)
-            </div>
-            <div className="text-amber-300">
-              [19:42:06] 📊 [Socket.IO] Broadcasted `job:progress` event &rarr; Progress: {demoProgress}%
-            </div>
-            {demoStatus === 'COMPLETED' && (
-              <div className="text-emerald-400 font-bold">
-                [19:42:08] ✅ [Worker] Job #task_8921 COMPLETED in 2.4s — Result: &#123;&quot;pdfUrl&quot;: &quot;s3://reports/august.pdf&quot;&#125;
+              <div className="rounded-2xl border border-slate-800/80 bg-slate-900/50 p-3">
+                <div className="flex items-center justify-between text-[10px] text-slate-400">
+                  <span>Job Progress</span>
+                  <Activity className="h-3.5 w-3.5 text-emerald-400" />
+                </div>
+                <div className="text-lg font-extrabold text-emerald-400 mt-1">{demoProgress}% Done</div>
+                <div className="w-full bg-slate-800 rounded-full h-1.5 mt-1.5 overflow-hidden">
+                  <div
+                    className="bg-emerald-500 h-full transition-all duration-500"
+                    style={{ width: `${demoProgress}%` }}
+                  />
+                </div>
               </div>
-            )}
+
+              <div className="rounded-2xl border border-slate-800/80 bg-slate-900/50 p-3">
+                <div className="flex items-center justify-between text-[10px] text-slate-400">
+                  <span>Redis Latency</span>
+                  <Zap className="h-3.5 w-3.5 text-amber-400" />
+                </div>
+                <div className="text-lg font-extrabold text-amber-300 mt-1">&lt; 1.8 ms</div>
+                <div className="text-[10px] text-slate-400 mt-0.5 font-mono">Socket.IO Stream</div>
+              </div>
+            </div>
+
+            {/* Terminal Logs Simulation */}
+            <div className="rounded-2xl border border-slate-800 bg-slate-950 p-3 font-mono text-[10px] sm:text-[11px] text-slate-300 space-y-1.5 leading-relaxed">
+              <div className="flex items-center gap-2 text-indigo-400">
+                <Terminal className="h-3.5 w-3.5" />
+                <span className="font-bold">TaskForge Stream Terminal</span>
+              </div>
+              <div className="text-slate-400">[19:42:01] ⚡ Worker ready on Redis 6379</div>
+              <div className="text-indigo-300">
+                [19:42:05] 🔄 Job #task_8921 (REPORT_GENERATION)
+              </div>
+              <div className="text-amber-300">
+                [19:42:06] 📊 `job:progress` event &rarr; {demoProgress}%
+              </div>
+              {demoStatus === 'COMPLETED' && (
+                <div className="text-emerald-400 font-bold">
+                  [19:42:08] ✅ Job #task_8921 COMPLETED in 2.4s
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </section>
