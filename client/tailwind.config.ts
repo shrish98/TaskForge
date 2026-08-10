@@ -10,14 +10,15 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        background: '#090d16',
-        surface: '#111827',
-        border: '#1f2937',
+        background: '#f6f5f2',
+        surface: '#ffffff',
+        border: '#e5e3dc',
         primary: {
-          50: '#eef2ff',
-          500: '#6366f1',
-          600: '#4f46e5',
-          700: '#4338ca',
+          50: '#fff4f0',
+          100: '#ffe5db',
+          500: '#f05228',
+          600: '#ea580c',
+          700: '#c23a15',
         },
       },
     },

@@ -4,22 +4,22 @@
 
 @layer base {
   :root {
-    --background: 224 71% 4%;
-    --foreground: 210 40% 98%;
+    --background: 45 14% 96%;
+    --foreground: 240 10% 4%;
   }
 
   body {
-    @apply bg-[#090d16] text-slate-100 antialiased selection:bg-indigo-500/30 selection:text-indigo-200;
+    @apply bg-[#f6f5f2] text-zinc-900 antialiased selection:bg-[#f05228]/20 selection:text-[#c23a15];
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
 }
 
 /* Glassmorphism & Custom Accents */
 .glass-panel {
-  background: rgba(17, 24, 39, 0.7);
+  background: rgba(255, 255, 255, 0.9);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(229, 227, 220, 0.8);
 }
 
 .glass-panel-hover {
@@ -27,17 +27,17 @@
 }
 
 .glass-panel-hover:hover {
-  background: rgba(30, 41, 59, 0.75);
-  border-color: rgba(99, 102, 241, 0.3);
-  box-shadow: 0 8px 32px -8px rgba(99, 102, 241, 0.15);
+  background: rgba(255, 255, 255, 0.98);
+  border-color: rgba(240, 82, 40, 0.3);
+  box-shadow: 0 8px 32px -8px rgba(240, 82, 40, 0.15);
 }
 
-.glow-purple {
-  box-shadow: 0 0 25px -5px rgba(99, 102, 241, 0.3);
+.glow-orange, .glow-purple, .glow-sky {
+  box-shadow: 0 0 25px -5px rgba(240, 82, 40, 0.25);
 }
 
 .glow-emerald {
-  box-shadow: 0 0 25px -5px rgba(16, 185, 129, 0.3);
+  box-shadow: 0 0 25px -5px rgba(16, 185, 129, 0.25);
 }
 
 /* Custom Scrollbar */
@@ -47,14 +47,14 @@
 }
 
 ::-webkit-scrollbar-track {
-  background: #090d16;
+  background: #f6f5f2;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #1e293b;
+  background: #d4d4d8;
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #334155;
+  background: #a1a1aa;
 }

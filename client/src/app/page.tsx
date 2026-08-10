@@ -148,7 +148,7 @@ function DashboardContent({ onShowLanding }: { onShowLanding?: () => void }) {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#090d16] text-slate-100 selection:bg-indigo-500/30">
+    <div className="flex min-h-screen flex-col bg-[#f6f5f2] text-[#18181b] selection:bg-[#f05228]/20">
       {/* Top Navbar */}
       <Navbar />
 
@@ -167,18 +167,18 @@ function DashboardContent({ onShowLanding }: { onShowLanding?: () => void }) {
           ) : (
             <>
               {/* Header Banner */}
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-800/80 pb-6">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-[#e5e3dc] pb-6">
                 <div>
                   <div className="flex items-center gap-2 mb-1">
                     <Badge variant={isConnected ? 'COMPLETED' : 'FAILED'} pulse={isConnected}>
                       {isConnected ? 'Socket.IO Real-Time Active' : 'Connecting Sockets...'}
                     </Badge>
-                    <span className="text-xs text-slate-400">• BullMQ Async Queue Engine</span>
+                    <span className="text-xs text-zinc-500">• BullMQ Async Queue Engine</span>
                   </div>
-                  <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
+                  <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-[#f05228]">
                     {activeTab === 'tasks' ? 'Task Queue Management' : 'Task Automation Dashboard'}
                   </h1>
-                  <p className="text-sm text-slate-400 mt-1">
+                  <p className="text-sm text-zinc-600 mt-1">
                     Live queue execution metrics, worker concurrency, and automated task logs.
                   </p>
                 </div>
@@ -209,69 +209,69 @@ function DashboardContent({ onShowLanding }: { onShowLanding?: () => void }) {
               {/* Executive Overview Metric Cards (Dashboard Tab Only) */}
               {activeTab === 'dashboard' && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <Card className="relative overflow-hidden">
+                  <Card className="relative overflow-hidden border-[#e5e3dc] bg-white">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                      <span className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">
                         Total Tasks
                       </span>
-                      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#fff4f0] text-[#f05228] border border-[#fcd5c7]">
                         <ListTodo className="h-4 w-4" />
                       </div>
                     </div>
                     <div className="mt-3 flex items-baseline gap-2">
-                      <span className="text-3xl font-bold text-white">{statsData?.total || 0}</span>
-                      <span className="text-xs font-medium text-emerald-400 flex items-center gap-0.5">
+                      <span className="text-3xl font-black text-[#18181b]">{statsData?.total || 0}</span>
+                      <span className="text-xs font-semibold text-emerald-600 flex items-center gap-0.5">
                         <TrendingUp className="h-3 w-3" /> Live
                       </span>
                     </div>
                   </Card>
 
-                  <Card className="relative overflow-hidden">
+                  <Card className="relative overflow-hidden border-[#e5e3dc] bg-white">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                      <span className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">
                         Processing / Pending
                       </span>
-                      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#fff4f0] text-[#f05228] border border-[#fcd5c7]">
                         <PlayCircle className="h-4 w-4" />
                       </div>
                     </div>
                     <div className="mt-3 flex items-baseline gap-2">
-                      <span className="text-3xl font-bold text-indigo-400">
+                      <span className="text-3xl font-black text-[#f05228]">
                         {(statsData?.processing || 0) + (statsData?.pending || 0)}
                       </span>
-                      <span className="text-xs text-slate-400">
+                      <span className="text-xs text-zinc-500 font-medium">
                         {statsData?.processing || 0} active, {statsData?.pending || 0} queued
                       </span>
                     </div>
                   </Card>
 
-                  <Card className="relative overflow-hidden">
+                  <Card className="relative overflow-hidden border-[#e5e3dc] bg-white">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                      <span className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">
                         Completed
                       </span>
-                      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200">
                         <CheckCircle2 className="h-4 w-4" />
                       </div>
                     </div>
                     <div className="mt-3 flex items-baseline gap-2">
-                      <span className="text-3xl font-bold text-emerald-400">{statsData?.completed || 0}</span>
-                      <span className="text-xs text-slate-400">100% finished</span>
+                      <span className="text-3xl font-black text-emerald-600">{statsData?.completed || 0}</span>
+                      <span className="text-xs text-zinc-500 font-medium">100% finished</span>
                     </div>
                   </Card>
 
-                  <Card className="relative overflow-hidden">
+                  <Card className="relative overflow-hidden border-[#e5e3dc] bg-white">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                      <span className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">
                         Failed Jobs
                       </span>
-                      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-rose-50 text-rose-600 border border-rose-200">
                         <AlertCircle className="h-4 w-4" />
                       </div>
                     </div>
                     <div className="mt-3 flex items-baseline gap-2">
-                      <span className="text-3xl font-bold text-rose-400">{statsData?.failed || 0}</span>
-                      <span className="text-xs text-slate-400">Max retries exceeded</span>
+                      <span className="text-3xl font-black text-rose-600">{statsData?.failed || 0}</span>
+                      <span className="text-xs text-zinc-500 font-medium">Max retries exceeded</span>
                     </div>
                   </Card>
                 </div>

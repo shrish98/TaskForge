@@ -4,7 +4,7 @@ import React from 'react';
 import { Task, TaskStatus, TaskType } from '../../services/task.service';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
-import { Search, RotateCcw, Trash2, Eye, Filter, ArrowUpDown, Layers } from 'lucide-react';
+import { Search, RotateCcw, Trash2, Eye } from 'lucide-react';
 
 interface TaskTableProps {
   tasks: (Task & { user?: { email: string; name: string } })[];
@@ -57,7 +57,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
   return (
     <div className="space-y-4">
       {/* Search & Filter Toolbar */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-900/40 p-4 rounded-2xl border border-slate-800/80">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-[#e5e3dc] shadow-sm">
         {/* Status Filter Tabs */}
         <div className="flex flex-wrap items-center gap-1.5 overflow-x-auto">
           {statusTabs.map((tab) => (
@@ -66,8 +66,8 @@ export const TaskTable: React.FC<TaskTableProps> = ({
               onClick={() => onStatusFilterChange(tab.id)}
               className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
                 statusFilter === tab.id
-                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
-                  : 'bg-slate-950/60 text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 border border-slate-800/60'
+                  ? 'bg-[#f05228] text-white shadow-md shadow-[#f05228]/20'
+                  : 'bg-[#faf9f6] text-zinc-600 hover:text-zinc-900 hover:bg-[#f0efe9] border border-[#e5e3dc]'
               }`}
             >
               {tab.label}
@@ -79,13 +79,13 @@ export const TaskTable: React.FC<TaskTableProps> = ({
         <div className="flex items-center gap-3">
           {/* Search Input */}
           <div className="relative flex-1 sm:w-64">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-zinc-400" />
             <input
               type="text"
               value={search}
               onChange={(e) => onSearchChange(e.target.value)}
               placeholder="Search title, ID..."
-              className="w-full rounded-xl border border-slate-800 bg-slate-950/60 py-2 pl-9 pr-3 text-xs text-slate-100 placeholder-slate-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className="w-full rounded-xl border border-[#e5e3dc] bg-white py-2 pl-9 pr-3 text-xs text-[#18181b] placeholder-zinc-400 focus:border-[#f05228] focus:outline-none focus:ring-1 focus:ring-[#f05228] transition-colors"
             />
           </div>
 
@@ -93,7 +93,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
           <select
             value={typeFilter}
             onChange={(e) => onTypeFilterChange(e.target.value as TaskType | 'ALL')}
-            className="rounded-xl border border-slate-800 bg-slate-950/60 py-2 px-3 text-xs text-slate-300 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            className="rounded-xl border border-[#e5e3dc] bg-white py-2 px-3 text-xs text-zinc-700 focus:border-[#f05228] focus:outline-none focus:ring-1 focus:ring-[#f05228] transition-colors"
           >
             <option value="ALL">All Types</option>
             <option value="FILE_PROCESSING">File Processing</option>
@@ -106,12 +106,12 @@ export const TaskTable: React.FC<TaskTableProps> = ({
       </div>
 
       {/* Task Queue Table */}
-      <div className="overflow-x-auto rounded-2xl border border-slate-800/80 bg-slate-900/40">
+      <div className="overflow-x-auto rounded-2xl border border-[#e5e3dc] bg-white shadow-sm">
         <table className="w-full text-left text-xs">
           <thead>
-            <tr className="border-b border-slate-800 text-slate-400 uppercase tracking-wider font-semibold bg-slate-950/50">
+            <tr className="border-b border-[#e5e3dc] text-zinc-500 uppercase tracking-wider font-bold bg-[#faf9f6]">
               <th className="py-3 px-4">Task Details</th>
-              {isAdmin && <th className="py-3 px-4 text-purple-400 font-bold">Task Owner</th>}
+              {isAdmin && <th className="py-3 px-4 text-purple-700 font-bold">Task Owner</th>}
               <th className="py-3 px-4">Status</th>
               <th className="py-3 px-4">Progress</th>
               <th className="py-3 px-4">Priority</th>
@@ -119,12 +119,12 @@ export const TaskTable: React.FC<TaskTableProps> = ({
               <th className="py-3 px-4 text-right">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-800/60">
+          <tbody className="divide-y divide-[#e5e3dc]/60">
             {isLoading ? (
               <tr>
-                <td colSpan={isAdmin ? 7 : 6} className="py-8 text-center text-slate-400">
+                <td colSpan={isAdmin ? 7 : 6} className="py-8 text-center text-zinc-500">
                   <div className="flex justify-center items-center gap-2">
-                    <svg className="h-5 w-5 animate-spin text-indigo-500" fill="none" viewBox="0 0 24 24">
+                    <svg className="h-5 w-5 animate-spin text-[#f05228]" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                       <path
                         className="opacity-75"
@@ -138,27 +138,27 @@ export const TaskTable: React.FC<TaskTableProps> = ({
               </tr>
             ) : tasks.length === 0 ? (
               <tr>
-                <td colSpan={isAdmin ? 7 : 6} className="py-12 text-center text-slate-500 italic">
+                <td colSpan={isAdmin ? 7 : 6} className="py-12 text-center text-zinc-500 italic">
                   No task records found matching your filters.
                 </td>
               </tr>
             ) : (
               tasks.map((task) => (
-                <tr key={task.id} className="hover:bg-slate-800/40 transition-colors">
+                <tr key={task.id} className="hover:bg-[#faf9f6]/80 transition-colors">
                   {/* Title & Type */}
                   <td className="py-3.5 px-4 max-w-xs">
-                    <div className="font-semibold text-slate-100 truncate">{task.title}</div>
-                    <div className="text-[10px] text-slate-400 font-mono mt-0.5 flex items-center gap-2">
+                    <div className="font-semibold text-[#18181b] truncate">{task.title}</div>
+                    <div className="text-[10px] text-zinc-500 font-mono mt-0.5 flex items-center gap-2">
                       <span>ID: {task.id.slice(0, 8)}...</span>
                       <span>•</span>
-                      <span className="text-indigo-400">{task.type}</span>
+                      <span className="text-[#f05228] font-semibold">{task.type}</span>
                     </div>
                   </td>
 
                   {/* Task Owner (Admin View) */}
                   {isAdmin && (
                     <td className="py-3.5 px-4 font-mono text-[11px]">
-                      <span className="rounded bg-purple-500/10 border border-purple-500/20 px-2 py-0.5 text-purple-300 font-semibold">
+                      <span className="rounded bg-purple-50 border border-purple-200 px-2 py-0.5 text-purple-700 font-semibold">
                         {task.user?.email || 'System'}
                       </span>
                     </td>
@@ -172,19 +172,19 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                   {/* Progress Bar */}
                   <td className="py-3.5 px-4 min-w-[140px]">
                     <div className="flex items-center gap-2">
-                      <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                      <div className="w-full bg-[#f0efe9] rounded-full h-1.5 overflow-hidden">
                         <div
                           className={`h-full rounded-full transition-all duration-500 ${
                             task.status === 'COMPLETED'
                               ? 'bg-emerald-500'
                               : task.status === 'FAILED'
                               ? 'bg-rose-500'
-                              : 'bg-indigo-500 animate-pulse'
+                              : 'bg-[#f05228] animate-pulse'
                           }`}
                           style={{ width: `${task.progress}%` }}
                         />
                       </div>
-                      <span className="font-mono text-[11px] text-slate-400 font-semibold">{task.progress}%</span>
+                      <span className="font-mono text-[11px] text-zinc-600 font-semibold">{task.progress}%</span>
                     </div>
                   </td>
 
@@ -193,10 +193,10 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                     <span
                       className={`rounded px-2 py-0.5 text-[10px] font-bold ${
                         task.priority === 3
-                          ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                          ? 'bg-rose-50 text-rose-700 border border-rose-200'
                           : task.priority === 2
-                          ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
-                          : 'bg-slate-800 text-slate-400'
+                          ? 'bg-[#fff4f0] text-[#f05228] border border-[#fcd5c7]'
+                          : 'bg-[#faf9f6] text-zinc-600 border border-[#e5e3dc]'
                       }`}
                     >
                       P{task.priority}
@@ -204,7 +204,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                   </td>
 
                   {/* Created Time */}
-                  <td className="py-3.5 px-4 text-slate-400 font-mono text-[11px]">
+                  <td className="py-3.5 px-4 text-zinc-500 font-mono text-[11px]">
                     {new Date(task.createdAt).toLocaleTimeString()}
                   </td>
 
@@ -214,7 +214,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                       {/* View Logs Button */}
                       <button
                         onClick={() => onViewLogs(task)}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors"
+                        className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-900 hover:bg-[#f0efe9] transition-colors"
                         title="View Logs & Output"
                       >
                         <Eye className="h-4 w-4" />
@@ -224,7 +224,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                       {task.status === 'FAILED' && (
                         <button
                           onClick={() => onRetryTask(task.id)}
-                          className="p-1.5 rounded-lg text-amber-400 hover:bg-amber-500/20 transition-colors"
+                          className="p-1.5 rounded-lg text-amber-600 hover:bg-amber-50 transition-colors"
                           title="Re-queue Task"
                         >
                           <RotateCcw className="h-4 w-4" />
@@ -234,7 +234,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                       {/* Delete Button */}
                       <button
                         onClick={() => onDeleteTask(task.id)}
-                        className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                        className="p-1.5 rounded-lg text-zinc-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
                         title="Delete Task"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -246,33 +246,33 @@ export const TaskTable: React.FC<TaskTableProps> = ({
             )}
           </tbody>
         </table>
-      </div>
 
-      {/* Pagination Bar */}
-      <div className="flex items-center justify-between px-2 text-xs text-slate-400">
-        <div>
-          Showing page <span className="font-bold text-slate-200">{pagination.page}</span> of{' '}
-          <span className="font-bold text-slate-200">{pagination.totalPages || 1}</span> ({pagination.total} total items)
-        </div>
+        {/* Pagination Bar */}
+        <div className="flex items-center justify-between px-6 py-4 border-t border-[#e5e3dc] bg-[#faf9f6] text-xs text-zinc-500">
+          <div>
+            Showing page <span className="font-bold text-[#18181b]">{pagination.page}</span> of{' '}
+            <span className="font-bold text-[#18181b]">{pagination.totalPages || 1}</span> ({pagination.total} total items)
+          </div>
 
-        <div className="flex items-center gap-2">
-          <Button
-            variant="secondary"
-            size="sm"
-            disabled={page <= 1 || isLoading}
-            onClick={() => onPageChange(page - 1)}
-          >
-            Previous
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={page <= 1 || isLoading}
+              onClick={() => onPageChange(page - 1)}
+            >
+              Previous
+            </Button>
 
-          <Button
-            variant="secondary"
-            size="sm"
-            disabled={page >= pagination.totalPages || isLoading}
-            onClick={() => onPageChange(page + 1)}
-          >
-            Next
-          </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={page >= pagination.totalPages || isLoading}
+              onClick={() => onPageChange(page + 1)}
+            >
+              Next
+            </Button>
+          </div>
         </div>
       </div>
     </div>

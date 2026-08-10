@@ -37,33 +37,33 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-[#090d16] p-4 text-slate-100 selection:bg-indigo-500/30">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-[#f6f5f2] p-4 text-[#18181b] selection:bg-[#f05228]/20">
       <div className="w-full max-w-md space-y-6">
         {/* Brand Header */}
         <div className="flex flex-col items-center text-center space-y-2">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-500 shadow-xl shadow-indigo-500/25">
-            <Cpu className="h-6 w-6 text-white" />
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#f05228] shadow-xl shadow-[#f05228]/25 text-white">
+            <Cpu className="h-6 w-6" />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-white">Create TaskForge Account</h1>
-          <p className="text-xs text-slate-400">
+          <h1 className="text-2xl font-bold tracking-tight text-[#18181b]">Create TaskForge Account</h1>
+          <p className="text-xs text-zinc-500">
             Provision your micro-SaaS workspace & background task worker access
           </p>
         </div>
 
-        {/* Register Glass Form Card */}
-        <Card className="border-slate-800/80 bg-slate-900/60 p-6 sm:p-8 backdrop-blur-xl">
+        {/* Register Form Card */}
+        <Card className="border-[#e5e3dc] bg-white p-6 sm:p-8 backdrop-blur-xl shadow-sm">
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
-              <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-300">
+              <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">
                 <span className="font-semibold">Registration Error:</span> {error}
               </div>
             )}
 
             {/* Full Name Field */}
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-300">Full Name</label>
+              <label className="text-xs font-semibold text-zinc-700">Full Name</label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-slate-500">
+                <div className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-zinc-400">
                   <UserIcon className="h-4 w-4" />
                 </div>
                 <input
@@ -72,16 +72,16 @@ export default function RegisterPage() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="John Doe"
-                  className="w-full rounded-xl border border-slate-800 bg-slate-950/60 py-2.5 pl-10 pr-4 text-xs text-slate-100 placeholder-slate-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-colors"
+                  className="w-full rounded-xl border border-[#e5e3dc] bg-white py-2.5 pl-10 pr-4 text-xs text-[#18181b] placeholder-zinc-400 focus:border-[#f05228] focus:outline-none focus:ring-1 focus:ring-[#f05228] transition-colors"
                 />
               </div>
             </div>
 
             {/* Email Field */}
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-300">Email Address</label>
+              <label className="text-xs font-semibold text-zinc-700">Email Address</label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-slate-500">
+                <div className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-zinc-400">
                   <Mail className="h-4 w-4" />
                 </div>
                 <input
@@ -90,16 +90,16 @@ export default function RegisterPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="developer@example.com"
-                  className="w-full rounded-xl border border-slate-800 bg-slate-950/60 py-2.5 pl-10 pr-4 text-xs text-slate-100 placeholder-slate-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-colors"
+                  className="w-full rounded-xl border border-[#e5e3dc] bg-white py-2.5 pl-10 pr-4 text-xs text-[#18181b] placeholder-zinc-400 focus:border-[#f05228] focus:outline-none focus:ring-1 focus:ring-[#f05228] transition-colors"
                 />
               </div>
             </div>
 
             {/* Password Field */}
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-300">Password</label>
+              <label className="text-xs font-semibold text-zinc-700">Password</label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-slate-500">
+                <div className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-zinc-400">
                   <Lock className="h-4 w-4" />
                 </div>
                 <input
@@ -109,7 +109,7 @@ export default function RegisterPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Minimum 6 characters"
-                  className="w-full rounded-xl border border-slate-800 bg-slate-950/60 py-2.5 pl-10 pr-4 text-xs text-slate-100 placeholder-slate-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-colors"
+                  className="w-full rounded-xl border border-[#e5e3dc] bg-white py-2.5 pl-10 pr-4 text-xs text-[#18181b] placeholder-zinc-400 focus:border-[#f05228] focus:outline-none focus:ring-1 focus:ring-[#f05228] transition-colors"
                 />
               </div>
             </div>
@@ -128,9 +128,9 @@ export default function RegisterPage() {
         </Card>
 
         {/* Footer Link to Login */}
-        <p className="text-center text-xs text-slate-400">
+        <p className="text-center text-xs text-zinc-500">
           Already have an account?{' '}
-          <Link href="/login" className="font-semibold text-indigo-400 hover:text-indigo-300 hover:underline">
+          <Link href="/login" className="font-semibold text-[#f05228] hover:text-[#ea580c] hover:underline">
             Sign in to existing account
           </Link>
         </p>

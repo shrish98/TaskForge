@@ -65,23 +65,23 @@ export const AuditLogsView: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="border-b border-slate-800/80 pb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="border-b border-[#e5e3dc] pb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <Terminal className="h-4 w-4 text-indigo-400" />
-            <span className="text-xs font-semibold text-indigo-400 font-mono">AUDIT TRAIL</span>
+            <Terminal className="h-4 w-4 text-[#f05228]" />
+            <span className="text-xs font-semibold text-[#f05228] font-mono">AUDIT TRAIL</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+          <h1 className="text-2xl sm:text-3xl font-black text-[#f05228] tracking-tight">
             System & Worker Execution Audit Logs
           </h1>
-          <p className="text-sm text-slate-400 mt-1">
+          <p className="text-sm text-zinc-500 mt-1">
             Searchable live execution stream, error stack traces, and worker event history.
           </p>
         </div>
       </div>
 
       {/* Toolbar */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-900/40 p-4 rounded-2xl border border-slate-800/80">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-[#e5e3dc] shadow-sm">
         <div className="flex items-center gap-2">
           {(['ALL', 'INFO', 'WARN', 'ERROR'] as const).map((level) => (
             <button
@@ -89,8 +89,8 @@ export const AuditLogsView: React.FC = () => {
               onClick={() => setFilterLevel(level)}
               className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
                 filterLevel === level
-                  ? 'bg-indigo-600 text-white shadow-md'
-                  : 'bg-slate-950/60 text-slate-400 hover:text-slate-200 border border-slate-800/60'
+                  ? 'bg-[#f05228] text-white shadow-md shadow-[#f05228]/20'
+                  : 'bg-[#faf9f6] text-zinc-600 hover:text-zinc-900 border border-[#e5e3dc]'
               }`}
             >
               {level}
@@ -99,30 +99,30 @@ export const AuditLogsView: React.FC = () => {
         </div>
 
         <div className="relative w-full sm:w-64">
-          <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
+          <Search className="absolute left-3 top-2.5 h-4 w-4 text-zinc-400" />
           <input
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Search log text..."
-            className="w-full rounded-xl border border-slate-800 bg-slate-950/60 py-2 pl-9 pr-3 text-xs text-slate-100 placeholder-slate-500 focus:border-indigo-500 focus:outline-none"
+            className="w-full rounded-xl border border-[#e5e3dc] bg-white py-2 pl-9 pr-3 text-xs text-[#18181b] placeholder-zinc-400 focus:border-[#f05228] focus:outline-none transition-colors"
           />
         </div>
       </div>
 
       {/* Log Console Terminal View */}
-      <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 font-mono text-xs space-y-3">
+      <div className="rounded-2xl border border-slate-800 bg-[#0c1017] p-4 font-mono text-xs space-y-3 shadow-sm">
         {filteredLogs.map((log) => (
-          <div key={log.id} className="flex items-start gap-3 border-b border-slate-900 pb-2.5 last:border-0 last:pb-0">
+          <div key={log.id} className="flex items-start gap-3 border-b border-slate-800/80 pb-2.5 last:border-0 last:pb-0">
             <span className="text-slate-500 shrink-0">{log.timestamp}</span>
 
             <span
               className={`px-2 py-0.5 rounded text-[10px] font-bold shrink-0 ${
                 log.level === 'INFO'
-                  ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
+                  ? 'bg-[#f05228]/20 text-orange-300 border border-[#f05228]/30'
                   : log.level === 'WARN'
-                  ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                  : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                  : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
               }`}
             >
               {log.level}
