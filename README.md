@@ -103,7 +103,7 @@ The telemetry page in the dashboard shows the same kinds of numbers live, from `
 
 There are two ways to run it, and they differ:
 
-- **The live demo** runs the API and the worker in **one process** (`RUN_WORKER_IN_API` unset) on a free-tier host. The dashboard is on Vercel.
+- **The live demo** runs the API and the worker in **one process** (`RUN_WORKER_IN_API` unset) on Render, which redeploys on every push to `main`. The dashboard is on Vercel.
 - **`docker compose up --build`** runs **five containers**: Postgres, Redis, the API (`RUN_WORKER_IN_API=false`), a separate worker, and the Next.js dashboard. The worker gets a 30 s stop grace period so it can finish jobs on shutdown.
 
 Schema changes ship as Prisma migrations in `server/prisma/migrations`. Apply them with `npx prisma migrate deploy`, or `npx prisma db push` for a database that was created with `db push`.
