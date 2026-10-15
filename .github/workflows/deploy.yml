@@ -1,19 +1,21 @@
-
 name: CD Pipeline - Deploy TaskForge to AWS EC2
+
+# Optional. The live demo doesn't run on EC2, so this job only runs once the repository variable
+# EC2_DEPLOY is set to "true" (Settings → Secrets and variables → Actions → Variables) and the
+# EC2_HOST, EC2_USERNAME and EC2_SSH_KEY secrets exist. Until then it is skipped, not failed.
 
 on:
   push:
     branches: [ main, master ]
+  workflow_dispatch:
 
 jobs:
   deploy-to-ec2:
     name: Deploy TaskForge Stack to AWS EC2
+    if: vars.EC2_DEPLOY == 'true'
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
       - name: Deploy to AWS EC2 via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -21,21 +23,12 @@ jobs:
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            echo "🚀 Starting TaskForge Deployment on EC2..."
-            
-            # Navigate to project directory (Adjust directory path if needed)
-            if [ -d "TaskForge" ]; then
-              cd TaskForge
-            fi
+            set -e
+            cd TaskForge
 
-            # Fetch latest changes from GitHub
             git fetch --all
             git reset --hard origin/${{ github.ref_name }}
 
-            # Rebuild and restart containerized services in background
+            # The API container syncs the database schema when it starts.
             docker compose up --build -d
-
-            # Clean up old unused Docker build caches to save EC2 disk space
             docker image prune -f
-
-            echo "✅ TaskForge deployment successfully completed!"
