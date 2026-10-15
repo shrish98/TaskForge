@@ -49,7 +49,7 @@ export class TaskRepository {
     });
   }
 
-  async findById(id: string): Promise<(Task & { taskLogs: any[]; user?: { email: string; name: string } }) | null> {
+  async findById(id: string): Promise<(Task & { taskLogs: any[]; runs?: any[]; user?: { email: string; name: string } }) | null> {
     return prisma.task.findUnique({
       where: { id },
       include: {
@@ -58,6 +58,9 @@ export class TaskRepository {
         },
         taskLogs: {
           orderBy: { createdAt: 'desc' },
+        },
+        runs: {
+          orderBy: { number: 'asc' },
         },
       },
     });
@@ -117,6 +120,14 @@ export class TaskRepository {
       where: { id },
       data: { status: TaskStatus.PROCESSING, progress: 5, attempts: attempt, startedAt: new Date(), error: null },
     });
+  }
+
+  async startAttempt(taskId: string, number: number, worker: string) {
+    return prisma.taskAttempt.create({ data: { taskId, number, worker }, select: { id: true } });
+  }
+
+  async finishAttempt(id: string, outcome: 'COMPLETED' | 'FAILED', error?: string) {
+    return prisma.taskAttempt.update({ where: { id }, data: { outcome, error, endedAt: new Date() } });
   }
 
   /** Only moves progress forward on a running task, so a late write can't undo a finished one. */

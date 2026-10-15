@@ -1,3 +1,4 @@
+import os from 'os';
 import { Job, UnrecoverableError } from 'bullmq';
 import { TaskStatus } from '@prisma/client';
 import { ZodError } from 'zod';
@@ -10,6 +11,9 @@ import { parseTaskPayload } from '../validations/task.validation.js';
 import { logger } from '../utils/logger.js';
 import { sendToDeadLetter } from './deadLetter.queue.js';
 import { MAX_ATTEMPTS, TaskJobData } from './task.queue.js';
+
+// Which process ran an attempt, shown on the worker timeline.
+const WORKER_ID = `${os.hostname()}:${process.pid}`;
 
 // Errors that will be the same on every attempt. Wrapping them in UnrecoverableError makes
 // BullMQ fail the job straight away instead of burning two more attempts and the backoff.
@@ -37,6 +41,7 @@ export async function processTaskJob(job: Job<TaskJobData>) {
     publishTaskEvent({ userId: task.userId, taskId, status, progress, ...extra });
 
   await taskRepository.markStarted(taskId, attempt);
+  const run = await taskRepository.startAttempt(taskId, attempt, WORKER_ID);
   await taskRepository.createTaskLog(taskId, 'INFO', `Attempt ${attempt}/${maxAttempts} started on worker`);
   await event(TaskStatus.PROCESSING, 5);
 
@@ -55,6 +60,7 @@ export async function processTaskJob(job: Job<TaskJobData>) {
     });
 
     if (outcome.artifact) await taskRepository.saveArtifact(taskId, outcome.artifact);
+    await taskRepository.finishAttempt(run.id, 'COMPLETED');
     await taskRepository.markCompleted(taskId, outcome.output);
     await taskRepository.createTaskLog(taskId, 'INFO', outcome.message);
     await event(TaskStatus.COMPLETED, 100, { message: outcome.message });
@@ -62,6 +68,7 @@ export async function processTaskJob(job: Job<TaskJobData>) {
   } catch (raw) {
     const err = toUnrecoverable(raw) as Error;
     const final = err instanceof UnrecoverableError || attempt >= maxAttempts;
+    await taskRepository.finishAttempt(run.id, 'FAILED', err.message);
 
     if (final) {
       // Park it first: once the row says FAILED, the dead-letter entry must already exist.

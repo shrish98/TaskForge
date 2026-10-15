@@ -117,6 +117,17 @@ describe('retries and the dead-letter queue', () => {
     expect(done.status).toBe('COMPLETED');
     expect(done.attempts).toBe(3);
     expect(done.taskLogs.filter((l) => l.level === 'WARN')).toHaveLength(2);
+
+    // Each attempt is its own run on the worker timeline, with the backoff gap between them.
+    const timeline = await api().get('/api/v1/system/timeline').set(auth());
+    const runs = timeline.body.data.filter((r: { task: { id: string } }) => r.task.id === task.id);
+    expect(runs.map((r: { number: number; outcome: string }) => [r.number, r.outcome])).toEqual([
+      [1, 'FAILED'],
+      [2, 'FAILED'],
+      [3, 'COMPLETED'],
+    ]);
+    expect(runs[0].error).toMatch(/HTTP 503/);
+    expect(new Date(runs[1].startedAt).getTime()).toBeGreaterThanOrEqual(new Date(runs[0].endedAt).getTime());
     // Every attempt carried the same idempotency key, so the receiver can dedupe.
     const keys = fixture.hits.filter((h) => h.path === '/flaky/twice').map((h) => h.headers['idempotency-key']);
     expect(keys).toEqual([task.id, task.id, task.id]);

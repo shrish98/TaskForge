@@ -74,6 +74,7 @@ model Task {
   updatedAt   DateTime   @updatedAt
   taskLogs    TaskLog[]
   artifact    TaskArtifact?
+  runs        TaskAttempt[]
 
   @@index([userId, status])
   @@index([createdAt])
@@ -100,4 +101,21 @@ model TaskArtifact {
   size      Int
   data      Bytes
   createdAt DateTime @default(now())
+}
+
+// One row per attempt at running a task, so retries can be shown as separate runs on the
+// worker timeline instead of being folded into the task's single start and end time.
+model TaskAttempt {
+  id        String    @id @default(uuid())
+  taskId    String
+  task      Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  number    Int
+  worker    String
+  outcome   String    @default("RUNNING") // RUNNING, COMPLETED or FAILED
+  error     String?
+  startedAt DateTime  @default(now())
+  endedAt   DateTime?
+
+  @@index([startedAt])
+  @@index([taskId])
 }

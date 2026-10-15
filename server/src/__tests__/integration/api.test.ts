@@ -115,6 +115,21 @@ describe('system routes', () => {
     expect(typeof res.body.data.redis.roundTripMs).toBe('number');
   });
 
+  it('returns log lines for the caller’s own tasks only, filterable by level', async () => {
+    const owner = await signUp('Owner');
+    const other = await signUp('Other');
+    const task = await createTask(owner.token, { title: 'Quarterly report', type: 'REPORT_GENERATION' });
+
+    const mine = await api().get('/api/v1/system/logs').set(auth(owner.token));
+    expect(mine.status).toBe(200);
+    expect(mine.body.data.data[0]).toMatchObject({ level: 'INFO', message: 'Queued for a worker', task: { id: task.id } });
+
+    const searched = await api().get('/api/v1/system/logs?search=quarterly').set(auth(owner.token));
+    expect(searched.body.data.data).toHaveLength(1);
+    expect((await api().get('/api/v1/system/logs?level=ERROR').set(auth(owner.token))).body.data.data).toHaveLength(0);
+    expect((await api().get('/api/v1/system/logs').set(auth(other.token))).body.data.data).toHaveLength(0);
+  });
+
   it('only lets admins read the dead-letter queue', async () => {
     const { token } = await signUp();
     const admin = await makeAdmin();
