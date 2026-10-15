@@ -1,265 +1,183 @@
-# 🚀 TaskForge - Distributed Task Automation & Real-Time Job Processing Engine
+# TaskForge
 
-[![CI/CD Pipeline](https://github.com/shrish98/TaskForge/actions/workflows/ci.yml/badge.svg)](https://github.com/shrish98/TaskForge/actions/workflows/ci.yml)
-![Node.js Version](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen)
-![Next.js Version](https://img.shields.io/badge/next.js-v15-blue)
-![TypeScript](https://img.shields.io/badge/typescript-v5-blue)
-![Docker](https://img.shields.io/badge/docker-ready-cyan)
-![License](https://img.shields.io/badge/license-MIT-green)
+[![CI](https://github.com/shrish98/TaskForge/actions/workflows/ci.yml/badge.svg)](https://github.com/shrish98/TaskForge/actions/workflows/ci.yml)
 
-> Production-ready **Micro-SaaS Asynchronous Task Processing Platform** built with Node.js, Express, TypeScript, BullMQ, Redis, PostgreSQL, Prisma ORM, Socket.IO WebSockets, and Next.js 15 (App Router).
+A background job platform built on Express, BullMQ and Redis. The API takes a task, a worker runs it off the request path, and the dashboard shows its progress live over Socket.IO. Failed jobs retry with backoff and, once out of attempts, land in a dead-letter queue.
 
----
+**Live demo:** [task-forge-zeta-ten.vercel.app](https://task-forge-zeta-ten.vercel.app/) · demo login `user@taskforge.ai` / `UserPassword123!`
 
-## 🌟 Executive Overview
+## What the jobs actually do
 
-TaskForge solves the challenge of handling heavy or time-consuming background operations (such as image compression, video transcoding, OCR extraction, web scraping, PDF report generation, and batch email dispatching) without blocking HTTP API request threads.
+Every job type does real work. None of them are timers that return canned output.
 
-### Key Capabilities:
-- ⚡ **Non-Blocking Architecture**: Express API Gateway offloads heavy workloads to dedicated Redis-backed BullMQ Workers.
-- 🔄 **Real-Time Telemetry**: Socket.IO WebSockets broadcast live job progress (`0%` ➔ `100%`), state transitions (`PENDING` ➔ `PROCESSING` ➔ `COMPLETED` / `FAILED`), and audit logs directly to connected user browser sessions without polling.
-- 🛡️ **Enterprise Security**: Dual-token JWT Authentication (15-min Access Tokens + 7-day Refresh Tokens stored in Redis & DB), password hashing with `bcrypt`, and Role-Based Access Control (`USER` / `ADMIN`).
-- 🔄 **Resilient Execution**: Automatic exponential backoff retries (max 3 attempts), delay scheduling, priority queueing (P1–P4), and step-by-step audit log trails (`TaskLog`).
-- 🎨 **Executive UI & SaaS Landing Page**: Next.js 15 App Router frontend with a high-conversion SaaS product landing page, glassmorphic dark theme (`#090d16`), Redux Toolkit global state, TanStack Query v5 cache management, and 5 interactive sidebar telemetry views.
+| Type | What it does | Payload |
+| --- | --- | --- |
+| `FILE_PROCESSING` | Downloads an image and reads its text with Tesseract (OCR). | `{ "imageUrl": "https://…" }` |
+| `WEB_SCRAPE` | Fetches a page and extracts its title, description, headings and links, plus the text of anything matching an optional CSS selector. | `{ "url": "https://…", "selector": "h2" }` |
+| `REPORT_GENERATION` | Builds a PDF of your task history (counts by status, run times by job type, recent tasks) from Postgres. | `{}` |
+| `DATA_EXPORT` | Streams your tasks out of Postgres in batches and writes a CSV, optionally filtered by status. | `{ "status": "FAILED" }` |
+| `NOTIFICATION_DISPATCH` | POSTs a JSON event to a webhook, signed with HMAC-SHA256, with an `Idempotency-Key` header. | `{ "webhookUrl": "https://…", "data": {} }` |
 
----
+The API validates each payload against its job type, so a bad payload gets a 400 straight away instead of failing three times in the worker. PDF and CSV files are stored with the task and downloaded from `GET /api/v1/tasks/:id/artifact`.
 
-## 🛠️ Complete Technology Stack
+## How a task runs
 
-| Layer | Technology | Key Function / Role |
-| :--- | :--- | :--- |
-| **Frontend Framework** | Next.js 15 (App Router) | Server Component SSR, Client Hydration, Routing, SaaS Landing Page |
-| **Global State** | Redux Toolkit | User session management, token persistence |
-| **Server State** | TanStack Query v5 | Data fetching, background refetching, user-scoped cache keys |
-| **Styling** | Tailwind CSS + Lucide Icons | Dark theme palette (`#090d16`), glassmorphism, micro-animations |
-| **Backend Framework** | Express.js & Node.js 20 | REST API Gateway, Routing, Socket Server Host |
-| **Language** | TypeScript 5 | Strict type safety across client and server |
-| **Database & ORM** | PostgreSQL 16 & Prisma | Relational entity storage, indexes, schema migrations, type-safe queries |
-| **Async Queue** | Redis 7 & BullMQ | Asynchronous job queues, workers, delayed execution, backoff retries |
-| **Real-Time** | Socket.IO | WebSockets engine emitting live progress % and task status updates |
-| **Security** | JWT + bcrypt | Dual-token authentication with Redis refresh token invalidation & RBAC |
-| **DevOps & Testing** | Docker & GitHub Actions | Multi-container orchestration, Jest unit testing, CI build validation |
-
----
-
-## 🚀 Quick Start Guide (Testing Locally)
-
-Follow either **Option A** (Standard Local Dev Setup) or **Option B** (1-Command Docker Setup) to test TaskForge on your local machine.
-
----
-
-### Option A: Standard Local Setup (Recommended for Developers)
-
-#### 1. System Requirements
-- [Node.js v20+](https://nodejs.org/)
-- [Docker Desktop](https://www.docker.com/) (running in background)
-- Git
-
-#### 2. Clone Repository & Install Dependencies
-```bash
-# Clone repository
-git clone https://github.com/shrish98/TaskForge.git
-cd TaskForge
-
-# Install root monorepo runner dependencies
-npm install
+```
+ POST /tasks ──► Postgres (task row) ──► BullMQ queue in Redis
+                                               │
+                                               ▼
+                                         Worker (5 at a time)
+                                               │  loads the task, runs the handler,
+                                               │  writes progress + logs to Postgres
+                                               ▼
+                         Redis pub/sub "taskforge:task-events"
+                                               │
+                                               ▼
+                         API ──► Socket.IO room for the task's owner ──► dashboard
 ```
 
-#### 3. Start PostgreSQL & Redis Containers
-Ensure Docker Desktop is open, then start the containerized databases:
+- **The job carries only ids.** The worker reads the task from Postgres when it runs, so edits made while it waits are picked up, and a task deleted in the meantime is skipped.
+- **Live updates go through Redis, not process memory.** The worker can run in another container with no Socket.IO server of its own. It publishes each change to a Redis channel, and every API instance forwards the change to the owner's room. The dashboard polls only while its socket is disconnected.
+- **All database writes happen inside the job, in order,** before BullMQ marks it done. An earlier version wrote from the worker's event listeners, and a late "progress" write could land after "completed".
+
+### Retries, the dead-letter queue and idempotency
+
+- **Retries and backoff.** Each task gets 3 attempts with exponential backoff: 2 s, then 4 s.
+- **Errors that won't fix themselves fail immediately.** A bad URL, a private address, a 404 from a webhook, or a page that isn't HTML is thrown as BullMQ's `UnrecoverableError`, which skips the remaining attempts.
+- **The dead-letter queue.** After the last attempt, a task is parked in the `taskforge-dead-letter` queue with its error. Admins can list it (`GET /api/v1/system/dead-letter`) and requeue tasks (`POST /api/v1/system/dead-letter/:taskId/requeue`).
+- **Manual retry starts over.** Retrying a failed task removes the old BullMQ job first, then queues the task again with a fresh set of attempts. BullMQ silently ignores `add()` while a job with the same id still exists, so before this fix retry did nothing.
+- **Duplicate requests.** `POST /api/v1/tasks` accepts an `Idempotency-Key` header. A repeated request with the same key gets the original task back (`200`, `Idempotent-Replayed: true`) instead of creating a duplicate job. The key is claimed atomically with Redis `SET NX`, so concurrent duplicates also produce one task.
+- **Webhook deduplication.** Webhook deliveries carry the task id as their `Idempotency-Key`, so a receiver can drop duplicates when a retry follows a delivery that landed but timed out.
+
+### Graceful shutdown
+
+On `SIGTERM`, the process shuts down in this order:
+1. It stops accepting HTTP connections and closes the sockets.
+2. It waits for running jobs to finish. `worker.close()` stops taking new jobs and waits for the active ones.
+3. It closes the queues, Redis and Prisma.
+
+A 25 s deadline forces exit. A job still running at that point isn't lost: BullMQ sees its lock expire and hands it to another worker as a stalled job.
+
+### Security
+
+- **SSRF protection.** Jobs fetch URLs that users type in, so every request goes through a guard:
+  - http and https only;
+  - each redirect hop is resolved and checked, and private, loopback, link-local and cloud-metadata addresses are refused;
+  - a timeout and a size cap.
+- **No self-assigned admins.** Registration always creates a regular user. An earlier version accepted `"role": "ADMIN"` from the client.
+- **CSV formula injection.** CSV cells starting with `=`, `+`, `-` or `@` are prefixed with a quote, so a task title can't run as a spreadsheet formula when the export is opened.
+- **Auth and access.**
+  - JWT access tokens (15 min) and refresh tokens (7 days, stored in Postgres and Redis).
+  - Role-based access: users see their own tasks, admins see all of them.
+  - Rate limits on the API and on auth routes.
+
+## Measured performance
+
+From the repo's load test (`server/scripts/loadtest.ts`). It runs `GET /api/v1/tasks` with 20 concurrent connections for 15 s, once with an idle queue and once while 50 OCR jobs run on the in-process worker.
+
+| GET /api/v1/tasks, 20 connections | requests/s | p50 | p97.5 | p99 |
+| --- | --- | --- | --- | --- |
+| Queue idle | 388 | 46 ms | 101 ms | 149 ms |
+| 50 OCR jobs running | 310 | 60 ms | 106 ms | 131 ms |
+
+- 50 OCR jobs drained in 16.4 s (3.05 jobs/s). Individual OCR runs: p50 670 ms, p95 2.1 s.
+- Redis round trip from the API: 1.1 ms.
+- Setup: a Ryzen 5 5500U laptop (12 threads), Node 22, with Postgres 16 and Redis 7 in Docker and the load generator all on the same machine. Expect different numbers on other hardware.
+
+The API stays responsive under OCR load because Tesseract runs in its own thread: median latency rose 14 ms and p99 didn't get worse. All OCR jobs share one Tesseract worker to keep memory flat on small hosts, so OCR throughput is about one core's worth. To get more, run more worker containers.
+
+The telemetry page in the dashboard shows the same kinds of numbers live, from `GET /api/v1/system/metrics`: queue counts, workers online, queue wait and run time percentiles, and Redis stats.
+
+## Deployment
+
+There are two ways to run it, and they differ:
+
+- **The live demo** runs the API and the worker in **one process** (`RUN_WORKER_IN_API` unset) on a free-tier host. The dashboard is on Vercel.
+- **`docker compose up --build`** runs **five containers**: Postgres, Redis, the API (`RUN_WORKER_IN_API=false`), a separate worker, and the Next.js dashboard. The worker gets a 30 s stop grace period so it can finish jobs on shutdown.
+
+Schema changes ship as Prisma migrations in `server/prisma/migrations`. Apply them with `npx prisma migrate deploy`, or `npx prisma db push` for a database that was created with `db push`.
+
+## Running it locally
+
 ```bash
 docker compose up postgres redis -d
-```
-*This starts PostgreSQL on `localhost:5432` and Redis on `localhost:6379`.*
 
-#### 4. Run Database Schema Migrations & Seed Users (First Time Only)
-Run the following to initialize the PostgreSQL schema and populate demo accounts:
-```bash
 cd server
-npx prisma migrate dev --name init
-npm run prisma:seed
-cd ..
-```
+npm install
+npx prisma migrate deploy
+npm run prisma:seed      # demo accounts + a few real tasks
+npm run dev              # API on :5000 with the worker in-process
 
-#### 5. Start All Application Services with 1 Command
-From the root directory, run:
-```bash
-npm run dev
-```
-
-*This single command starts all 3 application services concurrently using `concurrently`:*
-- 🌐 **Client (Next.js)**: `http://localhost:3000`
-- ⚡ **Server (Express API)**: `http://localhost:5000`
-- ⚙️ **Worker (BullMQ Task Processor)**: Running background queue loop
-
----
-
-### Option B: 1-Command Docker Setup (100% Containerized)
-
-If you don't want to install Node.js dependencies locally and want Docker to run the entire stack:
-
-```bash
-git clone https://github.com/shrish98/TaskForge.git
-cd TaskForge
-docker compose up --build
-```
-
-*Docker Compose will build and orchestrate all 5 microservice containers (Postgres, Redis, Server API, Worker Process, and Client Dashboard) automatically!*
-
----
-
-## 🧪 How to Test Features Step-by-Step
-
-Once `npm run dev` is running, open **[`http://localhost:3000`](http://localhost:3000)** in your browser to test the platform:
-
-### 1. ✨ Explore the SaaS Landing Page
-- Open `http://localhost:3000` when signed out.
-- Experience the product landing page featuring a live interactive worker terminal simulation, telemetry statistics, code integration tabs, and developer FAQs.
-
-### 2. 📝 Register a New User Account
-- Click **Get Started Free** or navigate to `http://localhost:3000/register`.
-- Create a new account with your name, email, and password.
-
-### 3. 👤 Test Asynchronous Task Dispatching & Real-Time WebSockets
-- Sign in as **Demo User** (`user@taskforge.ai` / `UserPassword123!`).
-- Click the indigo **`+ Create Task`** button in the top right.
-- Fill out the form:
-  - **Task Title**: `Generate Q3 Sales Invoice`
-  - **Task Type**: `REPORT_GENERATION` (or `FILE_PROCESSING`, `DATA_EXPORT`, `WEB_SCRAPE`, `NOTIFICATION_DISPATCH`)
-  - **Priority**: `P2 - High Priority`
-- Click **`Dispatch Task`**.
-- **Watch Live Progress**: Your task immediately appears in the queue. Observe the status shift live (`PENDING` ➔ `PROCESSING` ➔ `COMPLETED`) and the progress bar fill from **`0%` to `100%`** in real time via Socket.IO WebSockets!
-- **View Execution Audit Logs**: Click the **Eye (View Logs)** icon in the task row to inspect step-by-step audit logs and output payload URLs.
-
-### 4. 🛡️ Test Admin Multi-Tenant Oversight
-- Sign out and sign in with the **Admin Account** (`admin@taskforge.ai` / `AdminPassword123!`).
-- Notice the purple **"Global Admin Oversight Active"** banner.
-- As an Admin, you gain global visibility to view tasks created by **all users** across the platform, complete with a dedicated **Task Owner** column.
-- Click **Retry** on any failed job across system queues.
-
-### 5. 📊 Test Interactive Sidebar Views
-Click through the left navigation menu:
-- 📊 **Dashboard**: Executive metric cards & interactive Task Queue table.
-- 📋 **Task Queue**: Full-width focused task management table.
-- ⚡ **BullMQ Telemetry**: Live worker pool load distribution graph, Redis transport latency (< 1.8ms), memory stats, and operations/sec metrics.
-- 📜 **Task Logs**: Searchable audit console with level filters (`ALL`, `INFO`, `WARN`, `ERROR`).
-- ⚙️ **System Config**: Queue settings, worker concurrency thread sliders, and infrastructure health parameters.
-
----
-
-## 🗝️ Default Pre-Seeded Accounts
-
-| Account Role | Email Address | Password | Access Privileges |
-| :--- | :--- | :--- | :--- |
-| 👤 **Demo User** | `user@taskforge.ai` | `UserPassword123!` | Personal queue isolation, create/manage own background tasks |
-| 🛡️ **Admin User** | `admin@taskforge.ai` | `AdminPassword123!` | System-wide access, global metrics, view/retry all user tasks |
-
----
-
-## 📡 API Reference Endpoint Summary
-
-### Authentication Routes (`/api/v1/auth`)
-- `POST /api/v1/auth/register`: Create a new user account.
-- `POST /api/v1/auth/login`: Authenticate credentials & receive Access + Refresh tokens.
-- `POST /api/v1/auth/refresh-token`: Refresh Access Token using valid Refresh Token.
-- `POST /api/v1/auth/logout`: Revoke Refresh Token & invalidate Redis session.
-- `GET /api/v1/auth/me`: Fetch authenticated user profile (`Bearer` token required).
-
-### Task Queue Routes (`/api/v1/tasks`)
-- `POST /api/v1/tasks`: Dispatch new background task (Supports scheduling & JSON payload).
-- `GET /api/v1/tasks`: User-scoped or Admin-global paginated task list (Supports `search`, `status`, `type`, `page`, `limit`).
-- `GET /api/v1/tasks/:id`: Fetch single task details with execution audit logs (`TaskLog`).
-- `PATCH /api/v1/tasks/:id`: Update task parameters before processing.
-- `DELETE /api/v1/tasks/:id`: Cancel & delete task from database.
-- `POST /api/v1/tasks/:id/retry`: Re-queue a `FAILED` task for background worker retry.
-- `GET /api/v1/tasks/stats/summary`: Aggregate metrics for dashboard cards.
-
----
-
-## 🏗️ Project Directory Structure
-
-```
-TaskForge/
-├── .github/
-│   └── workflows/
-│       └── ci.yml             # Automated GitHub Actions CI/CD Pipeline
-├── docker-compose.yml         # Multi-container orchestrator (Postgres, Redis, Server, Worker, Client)
-├── package.json               # Root monorepo runner with concurrently & clean scripts
-├── README.md                  # System Documentation
-├── server/                    # Express API Gateway & BullMQ Async Worker
-│   ├── Dockerfile             # API Gateway container image
-│   ├── Dockerfile.worker      # BullMQ Worker container image
-│   ├── package.json
-│   ├── tsconfig.json
-│   ├── jest.config.js
-│   ├── prisma/
-│   │   ├── schema.prisma      # PostgreSQL Schema (User, Task, RefreshToken, TaskLog)
-│   │   └── seed.ts            # Database Seeding Script
-│   └── src/
-│       ├── index.ts           # Express API & Socket.IO Entrypoint
-│       ├── worker.ts          # Standalone Queue Worker Entrypoint
-│       ├── config/            # Database & Redis Configurations
-│       ├── controllers/       # HTTP Request Handlers
-│       ├── middlewares/       # AuthGuard, RateLimiter, ErrorHandler
-│       ├── queues/            # BullMQ Task Queue & Processor Simulations
-│       ├── repositories/      # Decoupled Prisma Data Access Layer
-│       ├── routes/            # Express Endpoint Routers
-│       ├── services/          # Business Logic (Task, Auth)
-│       └── socket/            # Socket.IO Real-Time Engine
-└── client/                    # Next.js 15 Micro-SaaS Frontend
-    ├── Dockerfile             # Next.js standalone container image
-    ├── package.json
-    └── src/
-        ├── app/               # Next.js 15 App Router (/login, /register, /)
-        ├── components/        # Glassmorphic UI Primitives, LandingPage, Telemetry, AuditLogs, Config
-        ├── hooks/             # Custom useSocket Real-Time Hook
-        ├── lib/               # Axios Instance with Refresh Interceptor
-        ├── providers/         # Redux + TanStack Query Combined Provider
-        └── store/             # Redux Toolkit Store & Auth Slice
-```
-
----
-
-## 🔄 CI/CD Pipeline & Automated Testing
-
-This repository includes a GitHub Actions Workflow ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) that automatically:
-1. Runs backend TypeScript type checking (`npx tsc --noEmit`) and Jest unit test suite (`npm test`).
-2. Runs Next.js frontend compilation & production build verification (`npm run build`).
-3. Validates Docker Compose container build integrity.
-
-To execute tests and verification locally:
-```bash
-# Run backend Jest unit tests
-cd server
-npm test
-
-# Run backend TypeScript typecheck
-npx tsc --noEmit
-
-# Run frontend production build
 cd ../client
-npm run build
+npm install
+npm run dev              # dashboard on :3000
 ```
 
----
+| Account | Email | Password |
+| --- | --- | --- |
+| Demo user | `user@taskforge.ai` | `UserPassword123!` |
+| Admin | `admin@taskforge.ai` | `AdminPassword123!` |
 
-## 💡 Engineering Decisions, Assumptions & Trade-Offs
+Optional settings:
+- `WEBHOOK_SIGNING_SECRET`: turns on webhook signatures.
+- `WORKER_CONCURRENCY`: jobs per worker. Default 5.
+- `JOB_BACKOFF_MS`: base retry delay. Default 2000.
+- `API_RATE_LIMIT`: requests per IP per 15 minutes. Default 300.
 
-### 1. Architectural Decisions
-- **Decoupled Worker Process**: Separated the Express API Gateway (`index.ts`) from the BullMQ Queue Processor (`worker.ts`) to ensure background tasks do not block CPU execution or thread event loops during heavy file/data computations.
-- **Repository Pattern**: Decoupled Prisma ORM database queries into dedicated repositories (`task.repository.ts`, `auth.repository.ts`) to adhere to SOLID principles and simplify unit test mocking.
-- **User-Scoped Query Keys**: Embedded `user.id` and `user.role` into React Query cache keys to ensure instant state invalidation when switching sessions without requiring manual page reloads.
+## Tests
 
-### 2. Key Assumptions
-- **Redis Availability**: Assumed Redis 7 is available for both BullMQ task queue storage and Socket.IO Pub/Sub adapter broadcasting.
-- **Task Payload Storage**: Assumed JSON payload format for task parameters (e.g., URLs, file references, export options).
+```bash
+cd server
+npm test                     # 47 unit tests: SSRF guard, scraper, CSV, signing, validation
+TEST_DATABASE_URL=postgresql://…/taskforge_test TEST_REDIS_URL=redis://localhost:6379/1 \
+  npm run test:integration   # 22 tests against real Postgres, Redis and a BullMQ worker
+```
 
-### 3. Trade-Offs & Future Improvements
-- **Blob Storage**: Currently simulates file processing by returning download URLs. Production implementation would integrate AWS S3 / Cloudflare R2 presigned URLs.
-- **Dead Letter Queue (DLQ)**: Tasks that fail after max 3 retries are assigned status `FAILED` and recorded in `TaskLog`. Future enhancements can add a dedicated DLQ inspection UI.
+The integration tests run real jobs against a local fixture server. They cover:
+- OCR on a fixture image;
+- retries succeeding on the third attempt;
+- giving up, landing in the dead-letter queue, then a manual retry;
+- 404s not being retried;
+- idempotency under concurrent requests;
+- ordered live events;
+- a worker finishing its job before shutting down;
+- users being kept out of each other's tasks.
 
----
+They refuse to run unless the database name contains `test` and Redis uses a database other than 0, because they wipe both.
 
-## 📜 License
+CI runs the type check, both suites (with Postgres and Redis service containers) and the Next.js production build on every push.
 
-Distributed under the MIT License. See `LICENSE` for details.
+### Load test
+
+```bash
+# terminal 1: a throwaway database, a high rate limit, and localhost fetches allowed for the fixture image
+cd server && npm run build
+DATABASE_URL=… REDIS_URL=… ALLOW_PRIVATE_URLS=true API_RATE_LIMIT=10000000 PORT=5055 node dist/index.js
+
+# terminal 2
+cd server && LOADTEST_URL=http://localhost:5055 npm run loadtest
+```
+
+## API
+
+| Method | Route | |
+| --- | --- | --- |
+| `POST` | `/api/v1/auth/register`, `/login`, `/refresh-token`, `/logout` | Auth |
+| `GET` | `/api/v1/auth/me` | Current user |
+| `POST` | `/api/v1/tasks` | Create and queue a task (`Idempotency-Key` supported) |
+| `GET` | `/api/v1/tasks` | List, with `search`, `status`, `type`, `page`, `limit` |
+| `GET` | `/api/v1/tasks/:id` | Task with its logs |
+| `PATCH` | `/api/v1/tasks/:id` | Edit a task that hasn't started |
+| `DELETE` | `/api/v1/tasks/:id` | Delete, removing its queued job |
+| `POST` | `/api/v1/tasks/:id/retry` | Re-queue a failed task |
+| `GET` | `/api/v1/tasks/:id/artifact` | Download the PDF or CSV a task produced |
+| `GET` | `/api/v1/tasks/stats/summary` | Counts by status |
+| `GET` | `/api/v1/system/metrics` | Live queue, worker, timing and Redis metrics |
+| `GET` | `/api/v1/system/dead-letter` | Dead-letter queue (admin) |
+| `POST` | `/api/v1/system/dead-letter/:taskId/requeue` | Requeue from the dead-letter queue (admin) |
+
+## Limits and next steps
+
+- **Artifacts in Postgres.** PDFs and CSVs are stored in Postgres as `bytea`. That's fine at this size; past a few MB per file, they belong in S3 or R2 behind presigned URLs.
+- **DNS rebinding.** The SSRF guard checks the address a hostname resolves to, then lets `fetch` resolve it again. Closing that gap fully means pinning the checked address in a custom HTTP agent.
+- **No cancellation.** A running job can't be cancelled; only waiting ones can, by deleting the task.

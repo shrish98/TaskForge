@@ -56,6 +56,8 @@ services:
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-taskforge_super_secret_refresh_key_2026_change_in_prod}
       JWT_ACCESS_EXPIRES_IN: ${JWT_ACCESS_EXPIRES_IN:-15m}
       JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
+      # The worker runs in its own container below, so the API doesn't start one.
+      RUN_WORKER_IN_API: "false"
     depends_on:
       postgres:
         condition: service_healthy
@@ -71,8 +73,11 @@ services:
       dockerfile: Dockerfile.worker
     container_name: taskforge_worker
     restart: always
+    # On SIGTERM the worker finishes its running jobs before exiting; give it time to.
+    stop_grace_period: 30s
     environment:
       NODE_ENV: production
+      WEBHOOK_SIGNING_SECRET: ${WEBHOOK_SIGNING_SECRET:-}
       DATABASE_URL: postgresql://${POSTGRES_USER:-taskforge_admin}:${POSTGRES_PASSWORD:-taskforge_password_2026}@postgres:5432/${POSTGRES_DB:-taskforge_db}?schema=public
       REDIS_HOST: redis
       REDIS_PORT: 6379
