@@ -98,6 +98,8 @@ function DashboardContent({ onShowLanding }: { onShowLanding?: () => void }) {
         sortOrder: 'desc',
       }),
     enabled: Boolean(user?.id),
+    // Live updates arrive over Socket.IO; poll only while the socket is down.
+    refetchInterval: isConnected ? false : 5000,
   });
 
   // TanStack Query: Fetch Stats Summary (Scoped to user.id & role)
@@ -105,7 +107,7 @@ function DashboardContent({ onShowLanding }: { onShowLanding?: () => void }) {
     queryKey: ['taskStats', user?.id, user?.role],
     queryFn: () => taskService.getStatsSummary(),
     enabled: Boolean(user?.id),
-    refetchInterval: 5000,
+    refetchInterval: isConnected ? false : 5000,
   });
 
   // Mutations
@@ -171,7 +173,7 @@ function DashboardContent({ onShowLanding }: { onShowLanding?: () => void }) {
                 <div>
                   <div className="flex items-center gap-2 mb-1">
                     <Badge variant={isConnected ? 'COMPLETED' : 'FAILED'} pulse={isConnected}>
-                      {isConnected ? 'Socket.IO Real-Time Active' : 'Connecting Sockets...'}
+                      {isConnected ? 'Live updates on' : 'Reconnecting, polling every 5s'}
                     </Badge>
                     <span className="text-xs text-zinc-500">• BullMQ Async Queue Engine</span>
                   </div>

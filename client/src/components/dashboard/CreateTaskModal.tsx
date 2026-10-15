@@ -2,8 +2,10 @@
 
 import React, { useState } from 'react';
 import { X, Plus, Calendar, Layers, AlertCircle } from 'lucide-react';
-import { CreateTaskPayload, TaskType } from '../../services/task.service';
+import { CreateTaskPayload, TaskType, TASK_TYPES } from '../../services/task.service';
 import { Button } from '../ui/Button';
+
+const examplePayload = (type: TaskType) => JSON.stringify(TASK_TYPES[type].example, null, 2);
 
 interface CreateTaskModalProps {
   isOpen: boolean;
@@ -23,7 +25,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
   const [type, setType] = useState<TaskType>('FILE_PROCESSING');
   const [priority, setPriority] = useState<number>(1);
   const [scheduledAt, setScheduledAt] = useState('');
-  const [payloadJson, setPayloadJson] = useState('{\n  "source": "api_upload"\n}');
+  const [payloadJson, setPayloadJson] = useState(examplePayload('FILE_PROCESSING'));
   const [jsonError, setJsonError] = useState<string | null>(null);
 
   if (!isOpen) return null;
@@ -51,14 +53,21 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
       scheduledAt: scheduledAt ? new Date(scheduledAt).toISOString() : undefined,
     };
 
-    await onSubmit(taskPayload);
+    try {
+      await onSubmit(taskPayload);
+    } catch (err: any) {
+      // The API checks the payload against the job type; show which field it rejected.
+      const first = err.response?.data?.errors?.[0];
+      setJsonError(first ? `${first.field}: ${first.message}` : err.response?.data?.message || 'Could not create the task');
+      return;
+    }
     // Reset form
     setTitle('');
     setDescription('');
     setType('FILE_PROCESSING');
     setPriority(1);
     setScheduledAt('');
-    setPayloadJson('{\n  "source": "api_upload"\n}');
+    setPayloadJson(examplePayload('FILE_PROCESSING'));
     onClose();
   };
 
@@ -120,14 +129,19 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
               <label className="font-semibold text-zinc-700">Task Type</label>
               <select
                 value={type}
-                onChange={(e) => setType(e.target.value as TaskType)}
+                onChange={(e) => {
+                  const next = e.target.value as TaskType;
+                  setType(next);
+                  setPayloadJson(examplePayload(next));
+                  setJsonError(null);
+                }}
                 className="w-full rounded-xl border border-[#e5e3dc] bg-white p-2.5 text-[#18181b] focus:border-[#f05228] focus:outline-none focus:ring-1 focus:ring-[#f05228] transition-colors"
               >
-                <option value="FILE_PROCESSING">File Processing</option>
-                <option value="DATA_EXPORT">Data Export</option>
-                <option value="REPORT_GENERATION">Report Generation</option>
-                <option value="WEB_SCRAPE">Web Scrape</option>
-                <option value="NOTIFICATION_DISPATCH">Notification Dispatch</option>
+                {(Object.keys(TASK_TYPES) as TaskType[]).map((t) => (
+                  <option key={t} value={t}>
+                    {TASK_TYPES[t].label}
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -144,6 +158,8 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
               </select>
             </div>
           </div>
+
+          <p className="-mt-2 text-[11px] text-zinc-500">{TASK_TYPES[type].summary}</p>
 
           {/* Scheduled Datetime (Optional) */}
           <div className="space-y-1.5">
@@ -165,7 +181,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
             <div className="flex items-center justify-between">
               <label className="font-semibold text-zinc-700 flex items-center gap-1.5">
                 <Layers className="h-3.5 w-3.5 text-[#f05228]" />
-                Payload JSON (Optional)
+                Payload JSON
               </label>
               {jsonError && (
                 <span className="text-[10px] font-semibold text-rose-600 flex items-center gap-1">

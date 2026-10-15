@@ -72,8 +72,8 @@ export const LandingPage: React.FC = () => {
       icon: <Activity className="h-6 w-6 text-emerald-400" />,
       title: 'Real-Time WebSocket Streams',
       description:
-        'Live job state notifications (`job:progress`, `job:completed`, `job:failed`) broadcasted over Socket.IO to eliminate polling overhead.',
-      badge: 'Sub-10ms Streaming',
+        'Workers publish every status change to Redis, and the API forwards it over Socket.IO to the task owner. The dashboard only polls while the socket is down.',
+      badge: 'Redis pub/sub',
     },
     {
       icon: <Shield className="h-6 w-6 text-purple-400" />,
@@ -86,8 +86,8 @@ export const LandingPage: React.FC = () => {
       icon: <Cpu className="h-6 w-6 text-indigo-400" />,
       title: 'Multi-Worker Pool Scalability',
       description:
-        'Decoupled worker instances capable of processing file operations, report generation, web scraping, and automated email dispatches.',
-      badge: 'Concurrency 5x',
+        'Five job types that do real work: OCR with Tesseract, web scraping, PDF reports, CSV exports and signed webhooks. Run the worker in the API process or as its own container.',
+      badge: 'Concurrency 5',
     },
     {
       icon: <Terminal className="h-6 w-6 text-cyan-400" />,
@@ -111,38 +111,38 @@ const response = await fetch('http://localhost:5000/api/v1/tasks', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
-    'Authorization': \`Bearer \${accessToken}\`
+    'Authorization': \`Bearer \${accessToken}\`,
+    // Safe to retry: the same key returns the same task instead of a duplicate
+    'Idempotency-Key': crypto.randomUUID()
   },
   body: JSON.stringify({
-    title: 'Process Monthly Financial Report',
+    title: 'Monthly activity report',
     type: 'REPORT_GENERATION',
-    priority: 3,
-    payload: { month: 'August', year: 2026, format: 'PDF' }
+    priority: 3
   })
 });
 
 const { data: task } = await response.json();
-console.log(\`Task \${task.id} queued successfully!\`);`,
-    curl: `# 2. Dispatch Task via cURL CLI
+// When it completes: GET /api/v1/tasks/:id/artifact downloads the PDF`,
+    curl: `# 2. Read the text in an image (OCR)
 curl -X POST http://localhost:5000/api/v1/tasks \\
   -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \\
   -H "Content-Type: application/json" \\
   -d '{
-    "title": "Batch Image Compression",
+    "title": "Read a scanned invoice",
     "type": "FILE_PROCESSING",
-    "priority": 2,
-    "payload": { "folder": "/uploads/raw" }
+    "payload": { "imageUrl": "https://tesseract.projectnaptha.com/img/eng_bw.png" }
   }'`,
-    worker: `// 3. BullMQ Worker Execution Handler
-export const taskWorker = new Worker('task_queue', async (job) => {
-  logger.info(\`Processing Job #\${job.id} (Type: \${job.data.type})\`);
-  
-  // Update progress ring via WebSockets
-  await job.updateProgress(50);
-  
-  const result = await executeHeavyTask(job.data.payload);
-  return { status: 'COMPLETED', result };
-}, { connection: redisConfig, concurrency: 5 });`,
+    worker: `// 3. One attempt of a job, inside the BullMQ worker
+const outcome = await jobHandlers[task.type]({
+  payload,
+  // Updates BullMQ, Postgres and the owner's socket, in that order
+  progress: (percent, message) => report(percent, message),
+});
+await taskRepository.markCompleted(taskId, outcome.output);
+// Throwing retries with backoff (2s, 4s). An UnrecoverableError
+// (bad URL, HTTP 404) fails at once. After the last attempt the
+// task is parked in the dead-letter queue.`,
   };
 
   const faqs = [
@@ -152,7 +152,7 @@ export const taskWorker = new Worker('task_queue', async (job) => {
     },
     {
       q: 'How does real-time progress streaming work?',
-      a: 'When a worker updates job progress (e.g. `job.updateProgress(75)`), the BullMQ QueueEvents listener detects the update and immediately emits a `job:progress` event over Socket.IO to connected browser clients, triggering instant UI state invalidation.',
+      a: 'The worker writes each step to Postgres, then publishes a `task:status_changed` event on a Redis channel. Every API instance subscribes to that channel and emits the event to the owner’s Socket.IO room, so it works even when the worker runs in a separate container.',
     },
     {
       q: 'Can I deploy TaskForge using Docker?',
@@ -292,8 +292,8 @@ export const taskWorker = new Worker('task_queue', async (job) => {
                   <span>Active Queue Concurrency</span>
                   <Cpu className="h-3.5 w-3.5 text-[#f05228]" />
                 </div>
-                <div className="text-base font-extrabold text-white mt-1">5 Workers Running</div>
-                <div className="text-[10px] text-emerald-400 mt-0.5 font-mono">100% Worker Efficiency</div>
+                <div className="text-base font-extrabold text-white mt-1">5 jobs at once</div>
+                <div className="text-[10px] text-emerald-400 mt-0.5 font-mono">per worker process</div>
               </div>
 
               <div className="rounded-2xl border border-slate-800/80 bg-[#18202c] p-3">
@@ -312,11 +312,11 @@ export const taskWorker = new Worker('task_queue', async (job) => {
 
               <div className="rounded-2xl border border-slate-800/80 bg-[#18202c] p-3">
                 <div className="flex items-center justify-between text-[10px] text-slate-400">
-                  <span>Redis Transport Latency</span>
+                  <span>Retry Policy</span>
                   <Zap className="h-3.5 w-3.5 text-[#f05228]" />
                 </div>
-                <div className="text-base font-extrabold text-amber-400 mt-1">&lt; 1.8 ms</div>
-                <div className="text-[10px] text-slate-400 mt-0.5 font-mono">Socket.IO Event Stream Active</div>
+                <div className="text-base font-extrabold text-amber-400 mt-1">3 attempts</div>
+                <div className="text-[10px] text-slate-400 mt-0.5 font-mono">2s, 4s backoff, then dead-letter</div>
               </div>
             </div>
 
@@ -347,22 +347,25 @@ export const taskWorker = new Worker('task_queue', async (job) => {
       <section className="border-y border-[#e5e3dc] bg-white py-12 px-6">
         <div className="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
           <div>
-            <div className="text-3xl sm:text-4xl font-black text-[#18181b] font-mono">99.99%</div>
-            <div className="text-xs font-semibold text-zinc-500 mt-1 uppercase tracking-wider">Queue Uptime SLA</div>
+            <div className="text-3xl sm:text-4xl font-black text-[#18181b] font-mono">60 ms</div>
+            <div className="text-xs font-semibold text-zinc-500 mt-1 uppercase tracking-wider">Median API latency with 50 OCR jobs running</div>
           </div>
           <div>
-            <div className="text-3xl sm:text-4xl font-black text-[#f05228] font-mono">5,000+</div>
-            <div className="text-xs font-semibold text-zinc-500 mt-1 uppercase tracking-wider">Jobs / Sec Scalability</div>
+            <div className="text-3xl sm:text-4xl font-black text-[#f05228] font-mono">3 / s</div>
+            <div className="text-xs font-semibold text-zinc-500 mt-1 uppercase tracking-wider">OCR jobs drained on one laptop</div>
           </div>
           <div>
-            <div className="text-3xl sm:text-4xl font-black text-amber-600 font-mono">&lt; 2 ms</div>
-            <div className="text-xs font-semibold text-zinc-500 mt-1 uppercase tracking-wider">Sub-ms Queue Latency</div>
+            <div className="text-3xl sm:text-4xl font-black text-amber-600 font-mono">1.1 ms</div>
+            <div className="text-xs font-semibold text-zinc-500 mt-1 uppercase tracking-wider">Redis round trip, measured</div>
           </div>
           <div>
-            <div className="text-3xl sm:text-4xl font-black text-[#18181b] font-mono">100%</div>
-            <div className="text-xs font-semibold text-zinc-500 mt-1 uppercase tracking-wider">RBAC Multi-Tenant</div>
+            <div className="text-3xl sm:text-4xl font-black text-[#18181b] font-mono">69</div>
+            <div className="text-xs font-semibold text-zinc-500 mt-1 uppercase tracking-wider">Unit + integration tests in CI</div>
           </div>
         </div>
+        <p className="max-w-7xl mx-auto mt-8 text-center text-xs text-zinc-500">
+          Measured with the repo&apos;s load test on a Ryzen 5 5500U laptop, with Postgres and Redis in Docker on the same machine.
+        </p>
       </section>
 
       {/* Core Features Grid Section */}

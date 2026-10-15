@@ -1,9 +1,11 @@
 'use client';
 
-import React from 'react';
-import { X, FileText, Activity } from 'lucide-react';
-import { Task } from '../../services/task.service';
+import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { X, FileText, Activity, Download } from 'lucide-react';
+import { Task, taskService } from '../../services/task.service';
 import { Badge } from '../ui/Badge';
+import { Button } from '../ui/Button';
 
 interface TaskLogModalProps {
   task: Task | null;
@@ -11,8 +13,28 @@ interface TaskLogModalProps {
   onClose: () => void;
 }
 
-export const TaskLogModal: React.FC<TaskLogModalProps> = ({ task, isOpen, onClose }) => {
-  if (!isOpen || !task) return null;
+export const TaskLogModal: React.FC<TaskLogModalProps> = ({ task: listTask, isOpen, onClose }) => {
+  // The list endpoint doesn't include logs, so load the full task. Socket events invalidate this
+  // query, so logs and progress update while the modal is open.
+  const { data: detail } = useQuery({
+    queryKey: ['task', listTask?.id],
+    queryFn: () => taskService.getTaskById(listTask!.id),
+    enabled: isOpen && Boolean(listTask?.id),
+  });
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+
+  if (!isOpen || !listTask) return null;
+  const task = detail ?? listTask;
+  const artifact = task.result?.artifact as { fileName: string; size: number } | undefined;
+
+  const download = async () => {
+    setDownloadError(null);
+    try {
+      await taskService.downloadArtifact(task.id, artifact?.fileName ?? 'taskforge-file');
+    } catch {
+      setDownloadError('Download failed. The file may have been replaced by a retry.');
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md">
@@ -70,10 +92,23 @@ export const TaskLogModal: React.FC<TaskLogModalProps> = ({ task, isOpen, onClos
           </div>
         )}
 
+        {artifact && task.status === 'COMPLETED' && (
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-[#e5e3dc] bg-[#faf9f6] p-3 text-xs">
+            <div>
+              <div className="font-semibold text-[#18181b]">{artifact.fileName}</div>
+              <div className="text-zinc-500">{(artifact.size / 1024).toFixed(1)} KB</div>
+              {downloadError && <div className="text-rose-600 mt-0.5">{downloadError}</div>}
+            </div>
+            <Button size="sm" variant="primary" onClick={download}>
+              <Download className="h-3.5 w-3.5" /> Download
+            </Button>
+          </div>
+        )}
+
         {task.result && (
           <div className="space-y-1">
             <span className="text-xs font-semibold text-zinc-700">Execution Result Output:</span>
-            <pre className="p-3 rounded-xl bg-[#0c1017] border border-slate-800 text-[11px] font-mono text-emerald-400 overflow-x-auto max-h-32">
+            <pre className="p-3 rounded-xl bg-[#0c1017] border border-slate-800 text-[11px] font-mono text-emerald-400 overflow-auto max-h-56 whitespace-pre-wrap break-words">
               {JSON.stringify(task.result, null, 2)}
             </pre>
           </div>
