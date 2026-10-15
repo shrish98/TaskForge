@@ -35,4 +35,6 @@ COPY prisma ./prisma/
 
 EXPOSE 5000
 
-CMD ["node", "dist/index.js"]
+# Sync the schema before starting, so a deploy that adds columns can't boot against an old
+# database. It's a no-op when nothing changed, and it refuses changes that would lose data.
+CMD ["sh", "-c", "npx prisma db push --skip-generate && node dist/index.js"]
