@@ -53,16 +53,32 @@ export const useSocket = () => {
         }
       );
       queryClient.invalidateQueries({ queryKey: ['task', event.taskId] });
-      // New, finished and failed tasks change counts, results and ordering, so refetch those.
-      if (event.status !== 'PROCESSING') {
-        queryClient.invalidateQueries({ queryKey: ['tasks'] });
-        queryClient.invalidateQueries({ queryKey: ['taskStats'] });
-        queryClient.invalidateQueries({ queryKey: ['systemMetrics'] });
-      }
+      scheduleRefetch(event.status !== 'PROCESSING');
     });
+
+    // Everything else (attempt counts, the timeline, log lines, totals) is refetched, but at most
+    // a few times a second, so a burst of 50 jobs doesn't turn into hundreds of requests.
+    let refetchTimer: ReturnType<typeof setTimeout> | undefined;
+    let includeTotals = false;
+    function scheduleRefetch(totals: boolean) {
+      includeTotals ||= totals;
+      if (refetchTimer) return;
+      refetchTimer = setTimeout(() => {
+        refetchTimer = undefined;
+        queryClient.invalidateQueries({ queryKey: ['tasks'] });
+        queryClient.invalidateQueries({ queryKey: ['timeline'] });
+        queryClient.invalidateQueries({ queryKey: ['logs'] });
+        if (includeTotals) {
+          queryClient.invalidateQueries({ queryKey: ['taskStats'] });
+          queryClient.invalidateQueries({ queryKey: ['systemMetrics'] });
+          includeTotals = false;
+        }
+      }, 300);
+    }
 
     return () => {
       clearTimeout(retryTimer);
+      clearTimeout(refetchTimer);
       socket.disconnect();
     };
   }, [isAuthenticated, queryClient, user]);

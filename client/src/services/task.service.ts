@@ -30,12 +30,38 @@ export interface Task {
   maxAttempts: number;
   progress: number;
   scheduledAt?: string;
+  startedAt?: string;
   completedAt?: string;
   failedAt?: string;
   userId: string;
   createdAt: string;
   updatedAt: string;
   taskLogs?: TaskLog[];
+  runs?: TaskRun[];
+  user?: { email: string; name: string };
+}
+
+/** One attempt at running a task. A task that was retried twice has three. */
+export interface TaskRun {
+  id: string;
+  number: number;
+  worker: string;
+  outcome: 'RUNNING' | 'COMPLETED' | 'FAILED' | 'ABANDONED';
+  error?: string | null;
+  startedAt: string;
+  endedAt?: string | null;
+}
+
+export interface TimelineRun extends TaskRun {
+  task: { id: string; title: string; type: TaskType; progress: number; maxAttempts: number };
+}
+
+export interface LogLine {
+  id: string;
+  level: 'INFO' | 'WARN' | 'ERROR';
+  message: string;
+  createdAt: string;
+  task: { id: string; title: string; type: TaskType };
 }
 
 export interface TaskQueryOptions {
@@ -123,6 +149,19 @@ export const taskService = {
     return res.data.data;
   },
 
+  async getTimeline(limit = 60): Promise<TimelineRun[]> {
+    const res = await api.get('/system/timeline', { params: { limit } });
+    return res.data.data;
+  },
+
+  async getLogs(params: { level?: string; search?: string; before?: string; limit?: number } = {}): Promise<{
+    data: LogLine[];
+    nextBefore: string | null;
+  }> {
+    const res = await api.get('/system/logs', { params });
+    return res.data.data;
+  },
+
   async getSystemMetrics(): Promise<SystemMetrics> {
     const res = await api.get('/system/metrics');
     return res.data.data;
@@ -166,29 +205,34 @@ export interface SystemMetrics {
 }
 
 /** What each job type does, and a payload that works for it, for the create-task form. */
-export const TASK_TYPES: Record<TaskType, { label: string; summary: string; example: Record<string, unknown> }> = {
+export const TASK_TYPES: Record<TaskType, { label: string; short: string; summary: string; example: Record<string, unknown> }> = {
   FILE_PROCESSING: {
     label: 'OCR (image to text)',
+    short: 'ocr',
     summary: 'Downloads an image and reads its text with Tesseract.',
     example: { imageUrl: 'https://tesseract.projectnaptha.com/img/eng_bw.png' },
   },
   WEB_SCRAPE: {
     label: 'Web scrape',
+    short: 'scrape',
     summary: 'Fetches a page and extracts its title, headings, links and any CSS selector you give.',
     example: { url: 'https://en.wikipedia.org/wiki/Message_queue', selector: 'h2' },
   },
   REPORT_GENERATION: {
     label: 'PDF report',
+    short: 'pdf',
     summary: 'Builds a PDF summary of your tasks: counts, run times and recent history.',
     example: {},
   },
   DATA_EXPORT: {
     label: 'CSV export',
+    short: 'csv',
     summary: 'Exports your tasks as a CSV file. Optionally filter by status.',
     example: { status: 'COMPLETED' },
   },
   NOTIFICATION_DISPATCH: {
     label: 'Webhook',
+    short: 'webhook',
     summary: 'POSTs a signed JSON event to a URL. Retries on 5xx and timeouts.',
     example: { webhookUrl: 'https://httpbin.org/post', data: { hello: 'world' } },
   },

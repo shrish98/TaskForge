@@ -3,58 +3,69 @@
 @tailwind utilities;
 
 @layer base {
-  :root {
-    --background: 45 14% 96%;
-    --foreground: 240 10% 4%;
+  html {
+    color-scheme: dark;
   }
 
   body {
-    @apply bg-[#f6f5f2] text-zinc-900 antialiased selection:bg-[#f05228]/20 selection:text-[#c23a15];
-    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    @apply bg-bg font-sans text-[14px] text-ink antialiased;
+    font-feature-settings: 'ss02';
+  }
+
+  ::selection {
+    background: rgba(245, 165, 36, 0.28);
+    color: #fff;
+  }
+
+  :focus-visible {
+    outline: 2px solid #f5a524;
+    outline-offset: 2px;
   }
 }
 
-/* Glassmorphism & Custom Accents */
-.glass-panel {
-  background: rgba(255, 255, 255, 0.9);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(229, 227, 220, 0.8);
+@layer components {
+  /* Small uppercase mono label used for column headers and stat names. */
+  .eyebrow {
+    @apply font-mono text-[10.5px] font-medium uppercase tracking-[0.1em] text-faint;
+  }
+
+  .btn {
+    @apply inline-flex h-8 items-center justify-center gap-1.5 whitespace-nowrap rounded px-3 text-[13px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply bg-amber text-bg hover:bg-amber-strong;
+  }
+  .btn-ghost {
+    @apply border border-line bg-panel text-ink hover:border-faint hover:text-strong;
+  }
+  .btn-danger {
+    @apply border border-line bg-panel text-bad hover:border-bad/60;
+  }
+
+  .field {
+    @apply h-8 w-full rounded border border-line bg-bg px-2.5 text-[13px] text-strong placeholder:text-faint focus:border-amber focus:outline-none;
+  }
+
+  .tab {
+    @apply rounded px-2.5 py-1 font-mono text-[12px] text-mute transition-colors hover:text-strong;
+  }
+  .tab[aria-pressed='true'] {
+    @apply bg-raise text-strong;
+  }
 }
 
-.glass-panel-hover {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+/* Thin, dark scrollbars to match the panels. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #2a3139 transparent;
 }
 
-.glass-panel-hover:hover {
-  background: rgba(255, 255, 255, 0.98);
-  border-color: rgba(240, 82, 40, 0.3);
-  box-shadow: 0 8px 32px -8px rgba(240, 82, 40, 0.15);
-}
-
-.glow-orange, .glow-purple, .glow-sky {
-  box-shadow: 0 0 25px -5px rgba(240, 82, 40, 0.25);
-}
-
-.glow-emerald {
-  box-shadow: 0 0 25px -5px rgba(16, 185, 129, 0.25);
-}
-
-/* Custom Scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-::-webkit-scrollbar-track {
-  background: #f6f5f2;
-}
-
-::-webkit-scrollbar-thumb {
-  background: #d4d4d8;
-  border-radius: 9999px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #a1a1aa;
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
 }

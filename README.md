@@ -20,6 +20,17 @@ Every job type does real work. None of them are timers that return canned output
 
 The API validates each payload against its job type, so a bad payload gets a 400 straight away instead of failing three times in the worker. PDF and CSV files are stored with the task and downloaded from `GET /api/v1/tasks/:id/artifact`.
 
+## The console
+
+The dashboard is built like an ops console: dark panels, monospace for anything measured, and colour only for job state.
+
+- **Worker timeline.** Every attempt at running a job is a block, packed into lanes so you can see how many ran at once. Retries are hatched red, final failures solid red, and running jobs grow in real time. Jobs take milliseconds to seconds, so a plain clock axis would draw them as slivers. Instead, runs close together form a burst drawn to scale, and the idle time between bursts is collapsed into a marked break (≈). The backoff gap between retries stays visible.
+- **Jobs and dead letter.** Each job shows its attempts as dots (red failed, green succeeded, amber running). A side panel shows every attempt with its worker, error and timing, plus the result, any file to download, and the job's full log. Retry and delete are there too.
+- **Logs.** One stream across all your jobs, filterable by level and searchable.
+- **Metrics.** Queue counts, run-time percentiles by job type, and Redis stats, all measured on request.
+
+Attempts are stored as their own rows (`TaskAttempt`), so the timeline and the side panel show real retry history rather than reconstructing it from logs.
+
 ## How a task runs
 
 ```
@@ -130,12 +141,12 @@ Optional settings:
 cd server
 npm test                     # 47 unit tests: SSRF guard, scraper, CSV, signing, validation
 TEST_DATABASE_URL=postgresql://…/taskforge_test TEST_REDIS_URL=redis://localhost:6379/1 \
-  npm run test:integration   # 22 tests against real Postgres, Redis and a BullMQ worker
+  npm run test:integration   # 23 tests against real Postgres, Redis and a BullMQ worker
 ```
 
 The integration tests run real jobs against a local fixture server. They cover:
 - OCR on a fixture image;
-- retries succeeding on the third attempt;
+- retries succeeding on the third attempt, recorded as three separate attempts;
 - giving up, landing in the dead-letter queue, then a manual retry;
 - 404s not being retried;
 - idempotency under concurrent requests;
@@ -173,6 +184,8 @@ cd server && LOADTEST_URL=http://localhost:5055 npm run loadtest
 | `GET` | `/api/v1/tasks/:id/artifact` | Download the PDF or CSV a task produced |
 | `GET` | `/api/v1/tasks/stats/summary` | Counts by status |
 | `GET` | `/api/v1/system/metrics` | Live queue, worker, timing and Redis metrics |
+| `GET` | `/api/v1/system/timeline` | Recent attempts for the worker timeline |
+| `GET` | `/api/v1/system/logs` | Log lines across your jobs (`level`, `search`, `before` cursor) |
 | `GET` | `/api/v1/system/dead-letter` | Dead-letter queue (admin) |
 | `POST` | `/api/v1/system/dead-letter/:taskId/requeue` | Requeue from the dead-letter queue (admin) |
 

@@ -1,564 +1,240 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useAppSelector } from '@/store/store';
-import {
-  Zap,
-  Server,
-  Shield,
-  Activity,
-  Cpu,
-  Layers,
-  Terminal,
-  CheckCircle2,
-  ArrowRight,
-  Code2,
-  Lock,
-  RefreshCw,
-  GitBranch,
-  Gauge,
-  Sparkles,
-  HelpCircle,
-  ChevronDown,
-  Globe,
-  Database,
-  BarChart3,
-} from 'lucide-react';
+import { ArrowRight, Github } from 'lucide-react';
+import { Mark } from '@/components/brand/Mark';
+import { WorkerTimeline } from '@/components/console/WorkerTimeline';
+import { TaskType, TimelineRun, TASK_TYPES } from '@/services/task.service';
+
+const REPO = 'https://github.com/shrish98/TaskForge';
+
+/* A scripted 14-second loop of runs for the hero, drawn by the same timeline component the
+   console uses. It is labelled as simulated; signed-in users see their own runs. */
+type Script = [type: TaskType, title: string, start: number, duration: number, outcome: 'COMPLETED' | 'FAILED', attempt: number, error?: string];
+const SCRIPT: Script[] = [
+  ['WEB_SCRAPE', 'Scrape “Message queue”', 0.0, 0.4, 'COMPLETED', 1],
+  ['FILE_PROCESSING', 'Read invoice INV-2290', 0.2, 1.9, 'COMPLETED', 1],
+  ['NOTIFICATION_DISPATCH', 'Notify billing', 0.6, 0.3, 'FAILED', 1, 'HTTP 503'],
+  ['DATA_EXPORT', 'Export failed tasks', 1.1, 0.5, 'COMPLETED', 1],
+  ['NOTIFICATION_DISPATCH', 'Notify billing', 2.9, 0.3, 'FAILED', 2, 'HTTP 503'],
+  ['REPORT_GENERATION', 'Monthly report', 3.2, 1.4, 'COMPLETED', 1],
+  ['FILE_PROCESSING', 'Read receipt #13', 3.6, 1.6, 'COMPLETED', 1],
+  ['NOTIFICATION_DISPATCH', 'Notify billing', 7.2, 0.2, 'COMPLETED', 3],
+  ['FILE_PROCESSING', 'Read invoice INV-2291', 7.4, 2.4, 'COMPLETED', 1],
+  ['WEB_SCRAPE', 'Scrape “Hacker News”', 7.9, 0.6, 'COMPLETED', 1],
+  ['NOTIFICATION_DISPATCH', 'Order webhook', 8.4, 0.3, 'FAILED', 3, 'HTTP 500'],
+];
+const LOOP_S = 11;
+
+function useDemoRuns(): TimelineRun[] {
+  const [epoch] = useState(() => Date.now());
+  const [now, setNow] = useState(epoch);
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 200);
+    return () => clearInterval(t);
+  }, []);
+
+  return useMemo(() => {
+    const elapsed = ((now - epoch) / 1000) % LOOP_S;
+    const loopStart = now - elapsed * 1000;
+    return SCRIPT.filter(([, , start]) => start <= elapsed).map(([type, title, start, duration, outcome, attempt, error], i) => {
+      const done = start + duration <= elapsed;
+      const startedAt = loopStart + start * 1000;
+      return {
+        id: `demo-${i}`,
+        number: attempt,
+        worker: 'demo',
+        outcome: done ? outcome : 'RUNNING',
+        error: done ? error : null,
+        startedAt: new Date(startedAt).toISOString(),
+        endedAt: done ? new Date(startedAt + duration * 1000).toISOString() : null,
+        task: { id: `demo-task-${i}`, title, type, maxAttempts: 3, progress: Math.min(99, Math.round(((elapsed - start) / duration) * 100)) },
+      };
+    });
+  }, [now, epoch]);
+}
+
+const JOBS: Array<{ type: TaskType; does: string; payload: string }> = [
+  { type: 'FILE_PROCESSING', does: 'Downloads an image and reads its text with Tesseract, in its own thread so the API stays responsive.', payload: '{ "imageUrl": "https://…/scan.png" }' },
+  { type: 'WEB_SCRAPE', does: 'Fetches a page and pulls out the title, headings, links and the text of any CSS selector.', payload: '{ "url": "https://…", "selector": "h2" }' },
+  { type: 'REPORT_GENERATION', does: 'Builds a PDF of your task history (status counts, run times by type) straight from Postgres.', payload: '{}' },
+  { type: 'DATA_EXPORT', does: 'Pages through your tasks in batches and writes a CSV, with spreadsheet formula injection defused.', payload: '{ "status": "FAILED" }' },
+  { type: 'NOTIFICATION_DISPATCH', does: 'POSTs a JSON event signed with HMAC-SHA256, carrying an Idempotency-Key so receivers can drop repeats.', payload: '{ "webhookUrl": "https://…" }' },
+];
+
+const FLOW = [
+  ['POST /api/v1/tasks', 'Payload validated against the job type. Optional Idempotency-Key, claimed with Redis SET NX.'],
+  ['Postgres', 'The task row is the source of truth: status, progress, attempts, result, logs.'],
+  ['BullMQ in Redis', 'The job carries only ids. Priority, delay and 3 attempts with exponential backoff.'],
+  ['Worker', 'Loads the task, runs the handler, writes each step to Postgres before the job settles.'],
+  ['Redis pub/sub', 'Every change is published, so a worker in another container can still reach the browser.'],
+  ['Socket.IO', 'The API forwards each event to the owner’s room. The dashboard only polls if the socket drops.'],
+];
+
+const FAILURES = [
+  { title: 'Retries with backoff', body: 'Three attempts, 2 s then 4 s apart. A webhook that returns 503 twice and then 200 ends up done.', demo: ['bad', 'bad', 'ok'] },
+  { title: 'No pointless retries', body: 'A 404, a private address or a non-image URL throws an UnrecoverableError and fails at once.', demo: ['bad', 'empty', 'empty'] },
+  { title: 'Dead-letter queue', body: 'Jobs out of attempts are parked with their error. Retrying one starts it over with fresh attempts.', demo: ['bad', 'bad', 'bad'] },
+  { title: 'Graceful shutdown', body: 'On SIGTERM the worker stops taking jobs and finishes the ones it has before the process exits.', demo: ['ok', 'live', 'empty'] },
+];
+
+const NUMBERS = [
+  ['60 ms', 'median API latency while 50 OCR jobs run'],
+  ['3.05 / s', 'OCR jobs drained, one laptop'],
+  ['1.1 ms', 'Redis round trip from the API'],
+  ['70', 'unit + integration tests in CI'],
+];
+
+function Dots({ states }: { states: string[] }) {
+  return (
+    <span className="inline-flex gap-[3px]">
+      {states.map((s, i) => (
+        <span
+          key={i}
+          className={`h-[7px] w-[7px] rounded-full border ${
+            s === 'bad' ? 'border-bad bg-bad' : s === 'ok' ? 'border-ok bg-ok' : s === 'live' ? 'animate-blink border-amber bg-amber' : 'border-faint/70'
+          }`}
+        />
+      ))}
+    </span>
+  );
+}
 
 export const LandingPage: React.FC = () => {
-  const router = useRouter();
-  const { isAuthenticated, user } = useAppSelector((state) => state.auth);
-  const [isMounted, setIsMounted] = useState(false);
-
-  // Live Interactive Demo Simulation State
-  const [demoProgress, setDemoProgress] = useState(35);
-  const [demoStatus, setDemoStatus] = useState<'PENDING' | 'PROCESSING' | 'COMPLETED'>('PROCESSING');
-  const [activeCodeTab, setActiveCodeTab] = useState<'curl' | 'node' | 'worker'>('node');
-  const [openFaq, setOpenFaq] = useState<number | null>(0);
-
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
-
-  // Simulate real-time job progress ring on landing page
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setDemoProgress((prev) => {
-        if (prev >= 100) {
-          setDemoStatus('COMPLETED');
-          setTimeout(() => {
-            setDemoProgress(0);
-            setDemoStatus('PROCESSING');
-          }, 2000);
-          return 100;
-        }
-        return prev + 15;
-      });
-    }, 1000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const features = [
-    {
-      icon: <Zap className="h-6 w-6 text-amber-400" />,
-      title: 'BullMQ & Redis Engine',
-      description:
-        'High-performance background job processing backed by Redis 7 and BullMQ queues with automatic retry exponential backoff strategies.',
-      badge: 'Core Queue Engine',
-    },
-    {
-      icon: <Activity className="h-6 w-6 text-emerald-400" />,
-      title: 'Real-Time WebSocket Streams',
-      description:
-        'Workers publish every status change to Redis, and the API forwards it over Socket.IO to the task owner. The dashboard only polls while the socket is down.',
-      badge: 'Redis pub/sub',
-    },
-    {
-      icon: <Shield className="h-6 w-6 text-purple-400" />,
-      title: 'Role-Based Security (RBAC)',
-      description:
-        'Multi-tenant user data isolation with dual JWT access & refresh token rotation and global administrative oversight for system admins.',
-      badge: 'JWT & Admin Telemetry',
-    },
-    {
-      icon: <Cpu className="h-6 w-6 text-indigo-400" />,
-      title: 'Multi-Worker Pool Scalability',
-      description:
-        'Five job types that do real work: OCR with Tesseract, web scraping, PDF reports, CSV exports and signed webhooks. Run the worker in the API process or as its own container.',
-      badge: 'Concurrency 5',
-    },
-    {
-      icon: <Terminal className="h-6 w-6 text-cyan-400" />,
-      title: 'Deep Execution Logs',
-      description:
-        'Step-by-step audit logs, execution timing, raw payload JSON inspection, and full error stack trace capture for instant debugging.',
-      badge: 'Audit Trail',
-    },
-    {
-      icon: <Layers className="h-6 w-6 text-pink-400" />,
-      title: 'Production Docker Containerized',
-      description:
-        'Complete dockerized environment with multi-stage Dockerfiles, Docker Compose orchestrations, and automated GitHub Actions CI/CD.',
-      badge: 'CI/CD Ready',
-    },
-  ];
-
-  const codeSnippets = {
-    node: `// 1. Dispatch Task to TaskForge REST API
-const response = await fetch('http://localhost:5000/api/v1/tasks', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-    'Authorization': \`Bearer \${accessToken}\`,
-    // Safe to retry: the same key returns the same task instead of a duplicate
-    'Idempotency-Key': crypto.randomUUID()
-  },
-  body: JSON.stringify({
-    title: 'Monthly activity report',
-    type: 'REPORT_GENERATION',
-    priority: 3
-  })
-});
-
-const { data: task } = await response.json();
-// When it completes: GET /api/v1/tasks/:id/artifact downloads the PDF`,
-    curl: `# 2. Read the text in an image (OCR)
-curl -X POST http://localhost:5000/api/v1/tasks \\
-  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "title": "Read a scanned invoice",
-    "type": "FILE_PROCESSING",
-    "payload": { "imageUrl": "https://tesseract.projectnaptha.com/img/eng_bw.png" }
-  }'`,
-    worker: `// 3. One attempt of a job, inside the BullMQ worker
-const outcome = await jobHandlers[task.type]({
-  payload,
-  // Updates BullMQ, Postgres and the owner's socket, in that order
-  progress: (percent, message) => report(percent, message),
-});
-await taskRepository.markCompleted(taskId, outcome.output);
-// Throwing retries with backoff (2s, 4s). An UnrecoverableError
-// (bad URL, HTTP 404) fails at once. After the last attempt the
-// task is parked in the dead-letter queue.`,
-  };
-
-  const faqs = [
-    {
-      q: 'What makes TaskForge different from basic background job libraries?',
-      a: 'TaskForge is an end-to-end job orchestration platform. It integrates BullMQ Redis queues, bidirectional Socket.IO streaming, dual JWT authentication, multi-tenant RBAC permissions, and an executive Next.js dark-mode UI out of the box.',
-    },
-    {
-      q: 'How does real-time progress streaming work?',
-      a: 'The worker writes each step to Postgres, then publishes a `task:status_changed` event on a Redis channel. Every API instance subscribes to that channel and emits the event to the owner’s Socket.IO room, so it works even when the worker runs in a separate container.',
-    },
-    {
-      q: 'Can I deploy TaskForge using Docker?',
-      a: 'Yes! TaskForge includes preconfigured multi-stage `Dockerfile` manifests for the Express API, BullMQ Worker, and Next.js client, along with `docker-compose.yml` for 1-command local or production deployment.',
-    },
-    {
-      q: 'What is the difference between USER and ADMIN roles?',
-      a: 'Standard users only see and manage their own background jobs. Admin users gain global administrative visibility to monitor telemetry metrics, view tasks across all workspace users, and retry failed jobs across the system.',
-    },
-  ];
+  const runs = useDemoRuns();
+  // The demo is built from the current time, so draw it only in the browser to keep the
+  // server render and the first client render identical.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   return (
-    <div className="min-h-screen bg-[#f6f5f2] text-[#18181b] selection:bg-[#f05228]/20 overflow-x-hidden font-sans">
-      {/* Background Ambient Warm Halos */}
-      <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[500px] bg-gradient-to-tr from-[#f05228]/10 via-amber-500/5 to-transparent rounded-full filter blur-[120px] pointer-events-none -z-10" />
-      <div className="fixed bottom-0 right-0 w-[600px] h-[400px] bg-[#f05228]/5 filter blur-[140px] pointer-events-none -z-10" />
-
-      {/* Top Glass Navigation Bar */}
-      <header className="sticky top-0 z-50 border-b border-[#e5e3dc] bg-white/90 backdrop-blur-xl">
-        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-          {/* Brand Logo */}
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#f05228] shadow-md shadow-[#f05228]/25 text-white">
-              <Zap className="h-6 w-6" />
-            </div>
-            <div>
-              <span className="text-xl font-black tracking-tight text-[#18181b] flex items-center gap-2">
-                TaskForge <span className="text-[10px] uppercase font-bold tracking-widest text-[#f05228] bg-[#fff4f0] px-2 py-0.5 rounded-full border border-[#fcd5c7]">v1.0 ENGINE</span>
-              </span>
-              <p className="text-[11px] text-zinc-500 font-medium">Distributed Job Processing Platform</p>
-            </div>
-          </div>
-
-          {/* Nav Links & Auth CTA */}
-          <div className="flex items-center gap-4">
-            {isMounted && isAuthenticated ? (
-              <button
-                onClick={() => router.push('/')}
-                className="flex items-center gap-2 rounded-xl bg-[#f05228] hover:bg-[#ea580c] px-5 py-2.5 text-xs font-bold text-white shadow-md shadow-[#f05228]/25 hover:scale-[1.02] transition-all"
-              >
-                <span>Go to Dashboard</span>
-                <ArrowRight className="h-4 w-4" />
-              </button>
-            ) : (
-              <>
-                <Link
-                  href="/login"
-                  className="text-xs font-semibold text-zinc-700 hover:text-zinc-900 transition-colors px-3 py-2"
-                >
-                  Sign In
-                </Link>
-                <Link
-                  href="/register"
-                  className="flex items-center gap-2 rounded-xl bg-[#f05228] hover:bg-[#ea580c] px-5 py-2.5 text-xs font-bold text-white shadow-md shadow-[#f05228]/25 hover:scale-[1.02] transition-all"
-                >
-                  <span>Get Started Free</span>
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
-              </>
-            )}
+    <div className="min-h-screen">
+      <header className="sticky top-0 z-20 border-b border-line bg-bg/90 backdrop-blur">
+        <div className="mx-auto flex h-14 max-w-6xl items-center gap-8 px-6">
+          <Link href="/" className="flex items-center gap-2.5 text-[15px] font-semibold text-strong">
+            <Mark /> TaskForge
+          </Link>
+          <nav className="hidden gap-6 text-[13px] text-mute md:flex">
+            <a href="#jobs" className="hover:text-strong">Jobs</a>
+            <a href="#flow" className="hover:text-strong">How it runs</a>
+            <a href="#failure" className="hover:text-strong">Failure handling</a>
+            <a href="#numbers" className="hover:text-strong">Numbers</a>
+          </nav>
+          <div className="ml-auto flex items-center gap-2">
+            <a href={REPO} className="btn btn-ghost hidden sm:inline-flex" target="_blank" rel="noreferrer">
+              <Github className="h-4 w-4" /> Source
+            </a>
+            <Link href="/login" className="btn btn-primary">
+              Open the console <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
           </div>
         </div>
       </header>
 
-      {/* Hero Section */}
-      <section className="relative pt-12 pb-20 md:pt-16 md:pb-28 px-6 max-w-7xl mx-auto">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
-          {/* Hero Left Content (Main Heading Section - 7/12 width) */}
-          <div className="lg:col-span-7 text-left space-y-6">
-            {/* Real-Time Engine Badge */}
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#fcd5c7] bg-[#fff4f0] px-3.5 py-1.5 text-xs font-semibold text-[#f05228] backdrop-blur-md shadow-inner">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#f05228] opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-[#f05228]"></span>
-              </span>
-              <span>Real-Time BullMQ + Socket.IO Distributed Architecture</span>
-            </div>
+      <section className="mx-auto max-w-6xl px-6 pb-14 pt-16 sm:pt-20">
+        <p className="eyebrow animate-fade-up">Express · BullMQ · Redis · Postgres · Socket.IO</p>
+        <h1 className="mt-4 max-w-4xl animate-fade-up text-[40px] font-semibold leading-[1.05] tracking-[-0.035em] text-strong [animation-delay:60ms] sm:text-[56px]">
+          A job queue you can <span className="text-amber">watch work.</span>
+        </h1>
+        <p className="mt-5 max-w-2xl animate-fade-up text-[16px] leading-relaxed text-mute [animation-delay:120ms]">
+          TaskForge takes heavy work off the request path. OCR, scraping, PDF reports, CSV exports and signed webhooks run on BullMQ
+          workers, retry with backoff, park in a dead-letter queue when they can’t succeed, and stream every step to your browser.
+        </p>
+        <div className="mt-8 flex animate-fade-up flex-wrap gap-3 [animation-delay:180ms]">
+          <Link href="/login" className="btn btn-primary h-10 px-4 text-[14px]">
+            Try it with the demo account <ArrowRight className="h-4 w-4" />
+          </Link>
+          <a href={`${REPO}#readme`} className="btn btn-ghost h-10 px-4 text-[14px]" target="_blank" rel="noreferrer">
+            Read how it’s built
+          </a>
+        </div>
 
-            {/* Main Hero Headline */}
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[1.12] text-[#18181b]">
-              High-Performance <br />
-              <span className="text-[#f05228]">
-                Async Job Processing Engine
-              </span>
-            </h1>
-
-            {/* Hero Subtitle */}
-            <p className="text-base sm:text-lg text-zinc-600 leading-relaxed max-w-2xl">
-              Power your background queues, scheduled tasks, and heavy worker processing with Redis persistence, automatic retry policies, and live WebSocket telemetry metrics.
-            </p>
-
-            {/* Hero Action Buttons */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-start gap-4 pt-2">
-              <Link
-                href="/register"
-                className="flex items-center justify-center gap-2 rounded-2xl bg-[#f05228] hover:bg-[#ea580c] px-7 py-4 text-sm font-bold text-white shadow-xl shadow-[#f05228]/25 hover:scale-[1.02] transition-all"
-              >
-                <Sparkles className="h-4 w-4" />
-                <span>Launch Demo Engine</span>
-                <ArrowRight className="h-4 w-4" />
-              </Link>
-              <Link
-                href="/login"
-                className="flex items-center justify-center gap-2 rounded-2xl border border-[#e5e3dc] bg-white px-7 py-4 text-sm font-semibold text-[#18181b] hover:bg-[#f0efe9] transition-all shadow-sm"
-              >
-                <Lock className="h-4 w-4 text-[#f05228]" />
-                <span>Sign In with Demo Account</span>
-              </Link>
-            </div>
+        <div className="mt-14 animate-fade-up border border-line bg-panel [animation-delay:240ms]">
+          <div className="flex items-center gap-3 border-b border-line px-5 py-3">
+            <span className="text-[13px] font-semibold text-strong">Worker timeline</span>
+            <span className="font-mono text-[11.5px] text-faint">simulated · sign in to see your own jobs</span>
+            <span className="ml-auto flex items-center gap-2 font-mono text-[11.5px] text-ok">
+              <span className="h-[7px] w-[7px] animate-blink rounded-full bg-ok" /> live
+            </span>
           </div>
-
-          {/* Live Interactive Telemetry Preview Mockup (Adjacent Right Column - 5/12 width) */}
-          <div className="lg:col-span-5 relative w-full rounded-3xl border border-slate-800 bg-[#121721] p-4 sm:p-5 shadow-2xl backdrop-blur-2xl overflow-hidden">
-            {/* Top Mockup Header Bar */}
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
-              <div className="flex items-center gap-2">
-                <div className="h-3 w-3 rounded-full bg-rose-500" />
-                <div className="h-3 w-3 rounded-full bg-amber-500" />
-                <div className="h-3 w-3 rounded-full bg-emerald-500" />
-                <span className="ml-2 font-mono text-[11px] text-slate-400 truncate max-w-[160px] sm:max-w-none">
-                  taskforge-live-telemetry.worker.internal
-                </span>
-              </div>
-
-              <div className="flex items-center gap-1.5 shrink-0">
-                <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="font-mono text-[10px] font-bold text-emerald-400">
-                  STATUS: ACTIVE WORKER POOL
-                </span>
-              </div>
-            </div>
-
-            {/* Interactive Live Worker Status Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 mb-4">
-              <div className="rounded-2xl border border-slate-800/80 bg-[#18202c] p-3">
-                <div className="flex items-center justify-between text-[10px] text-slate-400">
-                  <span>Active Queue Concurrency</span>
-                  <Cpu className="h-3.5 w-3.5 text-[#f05228]" />
-                </div>
-                <div className="text-base font-extrabold text-white mt-1">5 jobs at once</div>
-                <div className="text-[10px] text-emerald-400 mt-0.5 font-mono">per worker process</div>
-              </div>
-
-              <div className="rounded-2xl border border-slate-800/80 bg-[#18202c] p-3">
-                <div className="flex items-center justify-between text-[10px] text-slate-400">
-                  <span>Simulated Job Progress</span>
-                  <Activity className="h-3.5 w-3.5 text-emerald-400" />
-                </div>
-                <div className="text-base font-extrabold text-emerald-400 mt-1">{demoProgress}% Complete</div>
-                <div className="w-full bg-slate-800 rounded-full h-1.5 mt-1.5 overflow-hidden">
-                  <div
-                    className="bg-emerald-500 h-full transition-all duration-500"
-                    style={{ width: `${demoProgress}%` }}
-                  />
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-slate-800/80 bg-[#18202c] p-3">
-                <div className="flex items-center justify-between text-[10px] text-slate-400">
-                  <span>Retry Policy</span>
-                  <Zap className="h-3.5 w-3.5 text-[#f05228]" />
-                </div>
-                <div className="text-base font-extrabold text-amber-400 mt-1">3 attempts</div>
-                <div className="text-[10px] text-slate-400 mt-0.5 font-mono">2s, 4s backoff, then dead-letter</div>
-              </div>
-            </div>
-
-            {/* Terminal Logs Simulation */}
-            <div className="rounded-2xl border border-slate-800 bg-[#0a0e14] p-3 font-mono text-[10px] sm:text-[11px] text-slate-300 space-y-1.5 leading-relaxed">
-              <div className="flex items-center gap-2 text-[#f05228]">
-                <Terminal className="h-3.5 w-3.5" />
-                <span className="font-bold">TaskForge Execution Stream Terminal</span>
-              </div>
-              <div className="text-slate-400">[19:42:01] ⚡ Worker initialized with BullMQ Redis connection on port 6379</div>
-              <div className="text-[#f05228]">
-                [19:42:05] 🔄 [Worker] Processing Job #task_8921 (Type: REPORT_GENERATION, Priority: 3)
-              </div>
-              <div className="text-amber-400">
-                [19:42:06] 📊 [Socket.IO] Broadcasted `job:progress` event &rarr; Progress: {demoProgress}%
-              </div>
-              {demoStatus === 'COMPLETED' && (
-                <div className="text-emerald-400 font-bold">
-                  [19:42:08] ✅ [TaskProcessor] Job #task_8921 COMPLETED in 2.4s
-                </div>
-              )}
-            </div>
+          <div className="px-5 pb-3 pt-6">
+            {mounted ? <WorkerTimeline runs={runs} onOpen={() => undefined} /> : <div className="h-[100px]" />}
           </div>
         </div>
       </section>
 
-      {/* Metrics Banner */}
-      <section className="border-y border-[#e5e3dc] bg-white py-12 px-6">
-        <div className="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
-          <div>
-            <div className="text-3xl sm:text-4xl font-black text-[#18181b] font-mono">60 ms</div>
-            <div className="text-xs font-semibold text-zinc-500 mt-1 uppercase tracking-wider">Median API latency with 50 OCR jobs running</div>
-          </div>
-          <div>
-            <div className="text-3xl sm:text-4xl font-black text-[#f05228] font-mono">3 / s</div>
-            <div className="text-xs font-semibold text-zinc-500 mt-1 uppercase tracking-wider">OCR jobs drained on one laptop</div>
-          </div>
-          <div>
-            <div className="text-3xl sm:text-4xl font-black text-amber-600 font-mono">1.1 ms</div>
-            <div className="text-xs font-semibold text-zinc-500 mt-1 uppercase tracking-wider">Redis round trip, measured</div>
-          </div>
-          <div>
-            <div className="text-3xl sm:text-4xl font-black text-[#18181b] font-mono">69</div>
-            <div className="text-xs font-semibold text-zinc-500 mt-1 uppercase tracking-wider">Unit + integration tests in CI</div>
-          </div>
+      <section id="numbers" className="border-y border-line">
+        <div className="mx-auto grid max-w-6xl grid-cols-2 md:grid-cols-4">
+          {NUMBERS.map(([value, label]) => (
+            <div key={label} className="border-r border-line px-6 py-7 last:border-r-0 [&:nth-child(2)]:border-r-0 md:[&:nth-child(2)]:border-r">
+              <p className="font-mono text-[28px] text-strong">{value}</p>
+              <p className="mt-1 text-[13px] text-mute">{label}</p>
+            </div>
+          ))}
         </div>
-        <p className="max-w-7xl mx-auto mt-8 text-center text-xs text-zinc-500">
-          Measured with the repo&apos;s load test on a Ryzen 5 5500U laptop, with Postgres and Redis in Docker on the same machine.
+        <p className="mx-auto max-w-6xl border-t border-line px-6 py-3 font-mono text-[11.5px] text-faint">
+          Measured with the repo’s load test (autocannon, 20 connections) on a Ryzen 5 5500U, Postgres and Redis in Docker on the same machine.
         </p>
       </section>
 
-      {/* Core Features Grid Section */}
-      <section className="py-20 md:py-28 px-6 max-w-7xl mx-auto">
-        <div className="text-center max-w-3xl mx-auto mb-16 space-y-4">
-          <div className="inline-flex items-center gap-2 rounded-full border border-[#fcd5c7] bg-[#fff4f0] px-3 py-1 text-xs font-semibold text-[#f05228]">
-            <Gauge className="h-3.5 w-3.5" />
-            <span>Built for Modern Scale</span>
-          </div>
-          <h2 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-[#18181b]">
-            Everything You Need for <br />
-            <span className="text-[#f05228]">
-              Fault-Tolerant Background Workflows
-            </span>
-          </h2>
-          <p className="text-zinc-600 text-sm sm:text-base">
-            Engineered from the ground up with modular architecture, strict TypeScript validation, and real-time observability.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {features.map((feature, idx) => (
-            <div
-              key={idx}
-              className="group relative rounded-3xl border border-[#e5e3dc] bg-white p-8 hover:bg-[#faf9f6] hover:border-[#f05228]/40 transition-all duration-300 shadow-sm hover:shadow-md hover:shadow-orange-500/10"
-            >
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#fff4f0] border border-[#fcd5c7] group-hover:scale-110 transition-transform text-[#f05228]">
-                  {feature.icon}
-                </div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 bg-[#f0efe9] px-2.5 py-1 rounded-full border border-[#e5e3dc]">
-                  {feature.badge}
-                </span>
+      <section id="jobs" className="mx-auto max-w-6xl px-6 py-20">
+        <p className="eyebrow">What runs on the workers</p>
+        <h2 className="mt-3 max-w-2xl text-[28px] font-semibold tracking-[-0.025em] text-strong">Five job types. Each one does the real thing.</h2>
+        <div className="mt-10 border-t border-line">
+          {JOBS.map((job) => (
+            <div key={job.type} className="grid gap-2 border-b border-line py-5 md:grid-cols-[180px_1fr_300px] md:gap-8">
+              <div>
+                <p className="text-[14px] font-medium text-strong">{TASK_TYPES[job.type].label}</p>
+                <p className="font-mono text-[11.5px] text-faint">{job.type}</p>
               </div>
-              <h3 className="text-xl font-bold text-[#18181b] mb-3 group-hover:text-[#f05228] transition-colors">
-                {feature.title}
-              </h3>
-              <p className="text-sm text-zinc-600 leading-relaxed">{feature.description}</p>
+              <p className="text-[14px] leading-relaxed text-mute">{job.does}</p>
+              <code className="self-start rounded border border-line bg-panel px-3 py-2 font-mono text-[12px] text-ink">{job.payload}</code>
             </div>
           ))}
         </div>
       </section>
 
-      {/* Developer API Integration Section */}
-      <section className="py-20 px-6 max-w-7xl mx-auto border-t border-[#e5e3dc]">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-          <div className="space-y-6">
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#fcd5c7] bg-[#fff4f0] px-3 py-1 text-xs font-semibold text-[#f05228]">
-              <Code2 className="h-3.5 w-3.5" />
-              <span>Developer First APIs</span>
-            </div>
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-[#18181b] tracking-tight">
-              Enqueue Tasks in Seconds with Clean REST APIs
-            </h2>
-            <p className="text-zinc-600 text-sm leading-relaxed">
-              TaskForge exposes straightforward REST endpoints protected by JWT access tokens. Dispatch tasks asynchronously from any Node.js, Python, or Go microservice.
-            </p>
-
-            <div className="space-y-3 pt-2">
-              <div className="flex items-center gap-3 text-xs font-medium text-zinc-700">
-                <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                <span>Automatic Zod schema validation for strict payload safety</span>
-              </div>
-              <div className="flex items-center gap-3 text-xs font-medium text-zinc-700">
-                <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                <span>Custom task priorities, scheduled execution, and retry limits</span>
-              </div>
-              <div className="flex items-center gap-3 text-xs font-medium text-zinc-700">
-                <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                <span>Standardized JSON response envelope with pagination metadata</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Interactive Code Window */}
-          <div className="rounded-3xl border border-[#e5e3dc] bg-white p-6 shadow-xl">
-            {/* Code Tabs */}
-            <div className="flex items-center gap-2 border-b border-[#e5e3dc] pb-4 mb-4">
-              <button
-                onClick={() => setActiveCodeTab('node')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-                  activeCodeTab === 'node'
-                    ? 'bg-[#f05228] text-white'
-                    : 'text-zinc-600 hover:text-zinc-900'
-                }`}
-              >
-                Node.js Client
-              </button>
-              <button
-                onClick={() => setActiveCodeTab('curl')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-                  activeCodeTab === 'curl'
-                    ? 'bg-[#f05228] text-white'
-                    : 'text-zinc-600 hover:text-zinc-900'
-                }`}
-              >
-                cURL Request
-              </button>
-              <button
-                onClick={() => setActiveCodeTab('worker')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-                  activeCodeTab === 'worker'
-                    ? 'bg-[#f05228] text-white'
-                    : 'text-zinc-600 hover:text-zinc-900'
-                }`}
-              >
-                BullMQ Worker Handler
-              </button>
-            </div>
-
-            {/* Code Display */}
-            <pre className="font-mono text-xs text-slate-100 overflow-x-auto p-4 rounded-2xl bg-[#0c1017] leading-relaxed border border-slate-800">
-              <code>{codeSnippets[activeCodeTab]}</code>
-            </pre>
-          </div>
+      <section id="flow" className="border-t border-line bg-panel">
+        <div className="mx-auto max-w-6xl px-6 py-20">
+          <p className="eyebrow">How a task runs</p>
+          <h2 className="mt-3 max-w-2xl text-[28px] font-semibold tracking-[-0.025em] text-strong">From one POST to a progress bar in your browser.</h2>
+          <ol className="mt-10 grid gap-px border border-line bg-line md:grid-cols-3">
+            {FLOW.map(([step, detail], i) => (
+              <li key={step} className="bg-panel p-5">
+                <p className="font-mono text-[11.5px] text-amber">{String(i + 1).padStart(2, '0')}</p>
+                <p className="mt-2 font-mono text-[14px] text-strong">{step}</p>
+                <p className="mt-2 text-[13.5px] leading-relaxed text-mute">{detail}</p>
+              </li>
+            ))}
+          </ol>
         </div>
       </section>
 
-      {/* FAQ Section */}
-      <section className="py-20 px-6 max-w-4xl mx-auto border-t border-[#e5e3dc]">
-        <div className="text-center mb-12 space-y-3">
-          <div className="inline-flex items-center gap-2 rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
-            <HelpCircle className="h-3.5 w-3.5" />
-            <span>Frequently Asked Questions</span>
-          </div>
-          <h2 className="text-3xl font-extrabold text-[#18181b]">Got Questions? We Have Answers.</h2>
-        </div>
-
-        <div className="space-y-4">
-          {faqs.map((faq, idx) => (
-            <div
-              key={idx}
-              className="rounded-2xl border border-[#e5e3dc] bg-white overflow-hidden shadow-sm"
-            >
-              <button
-                onClick={() => setOpenFaq(openFaq === idx ? null : idx)}
-                className="w-full p-5 text-left flex items-center justify-between text-sm font-bold text-[#18181b] hover:text-[#f05228] transition-colors"
-              >
-                <span>{faq.q}</span>
-                <ChevronDown
-                  className={`h-4 w-4 text-zinc-400 transition-transform duration-300 ${
-                    openFaq === idx ? 'rotate-180 text-[#f05228]' : ''
-                  }`}
-                />
-              </button>
-              {openFaq === idx && (
-                <div className="px-5 pb-5 text-xs text-zinc-600 leading-relaxed border-t border-[#e5e3dc] pt-4">
-                  {faq.a}
-                </div>
-              )}
+      <section id="failure" className="mx-auto max-w-6xl px-6 py-20">
+        <p className="eyebrow">When things go wrong</p>
+        <h2 className="mt-3 max-w-2xl text-[28px] font-semibold tracking-[-0.025em] text-strong">Built for the jobs that fail.</h2>
+        <div className="mt-10 grid gap-8 md:grid-cols-2">
+          {FAILURES.map((f) => (
+            <div key={f.title} className="border-l-2 border-line pl-5">
+              <div className="flex items-center gap-3">
+                <h3 className="text-[15px] font-medium text-strong">{f.title}</h3>
+                <Dots states={f.demo} />
+              </div>
+              <p className="mt-2 text-[14px] leading-relaxed text-mute">{f.body}</p>
             </div>
           ))}
         </div>
       </section>
 
-      {/* Call To Action Banner */}
-      <section className="py-20 px-6 max-w-7xl mx-auto">
-        <div className="relative rounded-3xl bg-[#f05228] p-10 sm:p-16 text-center space-y-6 shadow-xl text-white overflow-hidden">
-          <div className="absolute top-0 right-0 w-96 h-96 bg-white/10 filter blur-3xl pointer-events-none" />
-
-          <h2 className="text-3xl sm:text-5xl font-black text-white tracking-tight">
-            Ready to Experience TaskForge in Action?
-          </h2>
-          <p className="text-orange-100 text-sm sm:text-base max-w-2xl mx-auto">
-            Test background task execution, real-time Socket.IO progress bars, and global administrative permissions today.
-          </p>
-
-          <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link
-              href="/register"
-              className="w-full sm:w-auto rounded-2xl bg-white px-8 py-4 text-sm font-extrabold text-[#18181b] hover:bg-[#f0efe9] shadow-xl transition-all hover:scale-[1.03]"
-            >
-              Create Free Account
-            </Link>
-            <Link
-              href="/login"
-              className="w-full sm:w-auto rounded-2xl border border-white/40 bg-white/10 px-8 py-4 text-sm font-semibold text-white hover:bg-white/20 transition-all backdrop-blur-sm"
-            >
-              Sign In to Demo
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="border-t border-[#e5e3dc] py-12 px-6 text-center text-xs text-zinc-500 bg-white">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <Zap className="h-4 w-4 text-[#f05228]" />
-            <span className="font-bold text-[#18181b]">TaskForge Engine v1.0</span>
-            <span>— Built with Next.js 14, Express, Prisma & BullMQ</span>
-          </div>
-          <div>© {new Date().getFullYear()} TaskForge Platform. All rights reserved.</div>
+      <footer className="border-t border-line">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-6 px-6 py-8 text-[13px] text-faint">
+          <span className="flex items-center gap-2 text-mute">
+            <Mark size={16} /> TaskForge
+          </span>
+          <span>Built by Shrishti Tomar</span>
+          <a href={REPO} className="hover:text-strong" target="_blank" rel="noreferrer">GitHub</a>
+          <Link href="/login" className="ml-auto text-amber hover:underline">Open the console →</Link>
         </div>
       </footer>
     </div>
