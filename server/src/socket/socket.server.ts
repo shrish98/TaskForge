@@ -1,6 +1,7 @@
 import { Server as HttpServer } from 'http';
 import { Server as SocketServer, Socket } from 'socket.io';
 import { TokenUtils, TokenPayload } from '../utils/token.utils.js';
+import { subscribeTaskEvents } from '../events/taskEvents.js';
 import { logger } from '../utils/logger.js';
 
 let io: SocketServer | null = null;
@@ -55,36 +56,15 @@ export const initSocketServer = (httpServer: HttpServer): SocketServer => {
     });
   });
 
+  // Task changes come from the worker (maybe another process) over Redis; forward each one to
+  // its owner's room, and to admins, who can see every task.
+  subscribeTaskEvents(({ userId, ...event }) => {
+    io?.to(`user_${userId}`).to('admin_room').emit('task:status_changed', event);
+  }).catch((err) => logger.error(`[Socket.IO] Could not subscribe to task events: ${err.message}`));
+
   return io;
 };
 
 export const getSocketServer = (): SocketServer | null => {
   return io;
-};
-
-export const emitToUser = (userId: string, event: string, data: any) => {
-  if (io) {
-    io.to(`user_${userId}`).emit(event, data);
-    if (event.startsWith('task:')) {
-      io.to('admin_room').emit(event, { ...data, isAdminBroadcast: true });
-    }
-  }
-};
-
-export const emitTaskStatusChanged = (
-  userId: string,
-  taskId: string,
-  status: string,
-  progress: number,
-  result?: any,
-  error?: string
-) => {
-  emitToUser(userId, 'task:status_changed', {
-    taskId,
-    status,
-    progress,
-    result,
-    error,
-    timestamp: new Date().toISOString(),
-  });
 };

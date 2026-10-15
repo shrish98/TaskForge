@@ -14,5 +14,6 @@ router.get('/:id', taskController.getTaskById);
 router.patch('/:id', taskController.updateTask);
 router.delete('/:id', taskController.deleteTask);
 router.post('/:id/retry', taskController.retryTask);
+router.get('/:id/artifact', taskController.downloadArtifact);
 
 export default router;

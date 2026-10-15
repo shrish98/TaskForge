@@ -10,6 +10,8 @@ function getRedisConfig() {
         port: parseInt(url.port || '6379', 10),
         password: url.password || undefined,
         username: url.username || undefined,
+        // redis://host:6379/2 selects database 2 (the tests use their own database number).
+        db: Number(url.pathname.slice(1)) || 0,
         tls: url.protocol === 'rediss:' ? { rejectUnauthorized: false } : undefined,
         maxRetriesPerRequest: null,
       };

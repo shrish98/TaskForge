@@ -1,12 +1,19 @@
-import { PrismaClient, Role, TaskStatus, TaskType } from '@prisma/client';
+import { Role, TaskType } from '@prisma/client';
 import bcrypt from 'bcryptjs';
-
-const prisma = new PrismaClient();
+import { prisma } from '../config/db.js';
+import { redis } from '../config/redis.js';
+import { taskQueue } from '../queues/task.queue.js';
+import { deadLetterQueue } from '../queues/deadLetter.queue.js';
+import { closeTaskEvents } from '../events/taskEvents.js';
+import { CreateTaskData } from '../repositories/task.repository.js';
+import { taskService } from '../services/task.service.js';
 
 async function main() {
   console.log('🌱 Starting database seed script...');
 
   // Clean existing data
+  await taskQueue.obliterate({ force: true });
+  await deadLetterQueue.obliterate({ force: true });
   await prisma.taskLog.deleteMany();
   await prisma.task.deleteMany();
   await prisma.refreshToken.deleteMany();
@@ -39,97 +46,44 @@ async function main() {
 
   console.log(`👤 Created Users: ${adminUser.email} (ADMIN), ${demoUser.email} (USER)`);
 
-  // Seed Demo Tasks
-  const task1 = await prisma.task.create({
-    data: {
-      title: 'Extract Text & Metadata from Invoice PDF',
-      description: 'Extract customer address, total amount, line items, and invoice number using OCR.',
-      type: TaskType.FILE_PROCESSING,
-      status: TaskStatus.COMPLETED,
-      priority: 3,
-      progress: 100,
-      payload: { fileName: 'invoice_2026_07.pdf', fileSizeMB: 2.4, fileType: 'application/pdf' },
-      result: { extractedAmount: '$1,450.00', invoiceNumber: 'INV-99201', vendor: 'Acme SaaS Corp' },
-      attempts: 1,
-      maxAttempts: 3,
-      userId: demoUser.id,
-      completedAt: new Date(),
-    },
-  });
-
-  await prisma.taskLog.createMany({
-    data: [
-      { taskId: task1.id, level: 'INFO', message: 'Job queued into Redis BullMQ engine.' },
-      { taskId: task1.id, level: 'INFO', message: 'Worker picked up invoice PDF processing.' },
-      { taskId: task1.id, level: 'INFO', message: 'OCR text extraction finished successfully (100%).' },
-    ],
-  });
-
-  const task2 = await prisma.task.create({
-    data: {
-      title: 'Scrape E-Commerce Competitor Price Catalog',
-      description: 'Crawl product listing pages for price fluctuations and stock updates.',
+  // Demo tasks go through the real service, so they are queued and run by the worker like any
+  // other task. They need Redis, and a worker running, to make progress.
+  const demoTasks: CreateTaskData[] = [
+    {
+      title: 'Scrape a Wikipedia article',
+      description: 'Fetch the page and pull out the title, headings and links.',
       type: TaskType.WEB_SCRAPE,
-      status: TaskStatus.PROCESSING,
       priority: 2,
-      progress: 65,
-      payload: { targetUrl: 'https://example-shop.com/catalog', maxPages: 50 },
-      attempts: 1,
-      maxAttempts: 3,
+      payload: { url: 'https://en.wikipedia.org/wiki/Message_queue', selector: 'h2' },
       userId: demoUser.id,
     },
-  });
-
-  await prisma.taskLog.createMany({
-    data: [
-      { taskId: task2.id, level: 'INFO', message: 'Scraper task initialized by worker.' },
-      { taskId: task2.id, level: 'INFO', message: 'Parsed pages 1-32. Extracted 420 items (65%).' },
-    ],
-  });
-
-  const task3 = await prisma.task.create({
-    data: {
-      title: 'Generate Quarterly Financial PDF Report',
-      description: 'Aggregate revenue metrics, server cost projections, and active subscriptions.',
-      type: TaskType.REPORT_GENERATION,
-      status: TaskStatus.PENDING,
+    {
+      title: 'OCR a scanned paragraph',
+      description: 'Download a sample image and read its text with Tesseract.',
+      type: TaskType.FILE_PROCESSING,
       priority: 1,
-      progress: 0,
-      payload: { format: 'PDF', includeCharts: true, period: 'Q2-2026' },
-      attempts: 0,
-      maxAttempts: 3,
+      payload: { imageUrl: 'https://tesseract.projectnaptha.com/img/eng_bw.png' },
       userId: demoUser.id,
     },
-  });
-
-  await prisma.taskLog.create({
-    data: { taskId: task3.id, level: 'INFO', message: 'Task queued. Awaiting available worker thread.' },
-  });
-
-  const task4 = await prisma.task.create({
-    data: {
-      title: 'Dispatch Batch Email Notifications to Subscribed Clients',
-      description: 'Send security digest emails to all registered tier-1 workspace users.',
+    {
+      title: 'Send a signed webhook',
+      description: 'POST a JSON event to httpbin, which echoes it back.',
       type: TaskType.NOTIFICATION_DISPATCH,
-      status: TaskStatus.FAILED,
-      priority: 2,
-      progress: 25,
-      payload: { recipientCount: 1500, templateId: 'sec_digest_v2' },
-      error: 'SMTP Gateway Timeout: Connection failed to mail server at port 587.',
-      attempts: 3,
-      maxAttempts: 3,
+      priority: 1,
+      payload: { webhookUrl: 'https://httpbin.org/post', data: { hello: 'from TaskForge' } },
       userId: demoUser.id,
-      failedAt: new Date(),
     },
-  });
+    {
+      title: 'Activity report (PDF)',
+      type: TaskType.REPORT_GENERATION,
+      priority: 1,
+      payload: {},
+      userId: demoUser.id,
+    },
+  ];
+  for (const task of demoTasks) await taskService.createTask(task);
 
-  await prisma.taskLog.createMany({
-    data: [
-      { taskId: task4.id, level: 'INFO', message: 'Dispatching email batch 1/15...' },
-      { taskId: task4.id, level: 'ERROR', message: 'Connection timed out to SMTP gateway on attempt 3.' },
-      { taskId: task4.id, level: 'ERROR', message: 'Task reached maxAttempts limit (3). Marked as FAILED.' },
-    ],
-  });
+  console.log(`📥 Queued ${demoTasks.length} demo tasks`);
 
   console.log('✅ Database seed completed successfully!');
 }
@@ -140,5 +94,6 @@ main()
     process.exit(1);
   })
   .finally(async () => {
+    await Promise.all([taskQueue.close(), deadLetterQueue.close(), closeTaskEvents(), redis.quit()]);
     await prisma.$disconnect();
   });

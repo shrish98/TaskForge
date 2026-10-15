@@ -111,35 +111,72 @@ export class TaskRepository {
     };
   }
 
-  async updateStatus(
-    id: string,
-    status: TaskStatus,
-    progress: number = 0,
-    result?: any,
-    error?: string
-  ): Promise<Task> {
-    const updateData: Prisma.TaskUpdateInput = {
-      status,
-      progress,
-      ...(result !== undefined ? { result: result as Prisma.InputJsonValue } : {}),
-      ...(error !== undefined ? { error } : {}),
-      ...(status === TaskStatus.COMPLETED ? { completedAt: new Date() } : {}),
-      ...(status === TaskStatus.FAILED ? { failedAt: new Date() } : {}),
-    };
-
+  /** Marks the start of an attempt. `attempt` comes from BullMQ, so re-running it is harmless. */
+  async markStarted(id: string, attempt: number): Promise<Task> {
     return prisma.task.update({
       where: { id },
-      data: updateData,
+      data: { status: TaskStatus.PROCESSING, progress: 5, attempts: attempt, startedAt: new Date(), error: null },
     });
   }
 
-  async incrementAttempts(id: string): Promise<Task> {
+  /** Only moves progress forward on a running task, so a late write can't undo a finished one. */
+  async updateProgress(id: string, progress: number) {
+    return prisma.task.updateMany({
+      where: { id, status: TaskStatus.PROCESSING, progress: { lt: progress } },
+      data: { progress },
+    });
+  }
+
+  async markCompleted(id: string, result: Record<string, unknown>): Promise<Task> {
     return prisma.task.update({
       where: { id },
       data: {
-        attempts: { increment: 1 },
+        status: TaskStatus.COMPLETED,
+        progress: 100,
+        result: result as Prisma.InputJsonValue,
+        error: null,
+        completedAt: new Date(),
+        failedAt: null,
       },
     });
+  }
+
+  async markFailed(id: string, error: string): Promise<Task> {
+    return prisma.task.update({
+      where: { id },
+      data: { status: TaskStatus.FAILED, error, failedAt: new Date() },
+    });
+  }
+
+  async resetForRetry(id: string): Promise<Task> {
+    return prisma.task.update({
+      where: { id },
+      data: {
+        status: TaskStatus.PENDING,
+        progress: 0,
+        attempts: 0,
+        error: null,
+        result: Prisma.JsonNull,
+        startedAt: null,
+        completedAt: null,
+        failedAt: null,
+      },
+    });
+  }
+
+  /** One file per task; a retry that produces a new file replaces the old one. */
+  async saveArtifact(taskId: string, artifact: { fileName: string; mimeType: string; data: Buffer }) {
+    const data = { fileName: artifact.fileName, mimeType: artifact.mimeType, size: artifact.data.length, data: artifact.data };
+    return prisma.taskArtifact.upsert({
+      where: { taskId },
+      create: { taskId, ...data },
+      update: { ...data, createdAt: new Date() },
+      select: { id: true },
+    });
+  }
+
+  async findArtifact(taskId: string) {
+    return prisma.taskArtifact.findUnique({ where: { taskId } });
   }
 
   async update(id: string, data: Partial<CreateTaskData>): Promise<Task> {

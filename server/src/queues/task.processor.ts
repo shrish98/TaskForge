@@ -1,163 +1,89 @@
-import { Job } from 'bullmq';
-import { TaskJobData } from './task.queue.js';
+import { Job, UnrecoverableError } from 'bullmq';
+import { TaskStatus } from '@prisma/client';
+import { ZodError } from 'zod';
+import { prisma } from '../config/db.js';
+import { jobHandlers } from '../jobs/index.js';
+import { UnsafeUrlError } from '../lib/safeFetch.js';
+import { taskRepository } from '../repositories/task.repository.js';
+import { publishTaskEvent } from '../events/taskEvents.js';
+import { parseTaskPayload } from '../validations/task.validation.js';
+import { logger } from '../utils/logger.js';
+import { sendToDeadLetter } from './deadLetter.queue.js';
+import { MAX_ATTEMPTS, TaskJobData } from './task.queue.js';
 
-export interface ProcessingResult {
-  success: boolean;
-  output: any;
-  message: string;
-}
+// Errors that will be the same on every attempt. Wrapping them in UnrecoverableError makes
+// BullMQ fail the job straight away instead of burning two more attempts and the backoff.
+const toUnrecoverable = (err: unknown) =>
+  err instanceof UnsafeUrlError || err instanceof ZodError
+    ? new UnrecoverableError(err instanceof ZodError ? `Invalid payload: ${err.issues[0]?.message}` : err.message)
+    : err;
 
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+/**
+ * Runs one attempt of a task. Every database write happens here, in order, before the job
+ * settles, so the task row never disagrees with BullMQ about where the job is. (Writing from
+ * the worker's event listeners raced: a late "progress" write could land after "completed".)
+ */
+export async function processTaskJob(job: Job<TaskJobData>) {
+  const { taskId } = job.data;
+  const task = await prisma.task.findUnique({ where: { id: taskId } });
+  if (!task) {
+    logger.info(`[Worker] Task ${taskId} was deleted before it ran; skipping`);
+    return { skipped: true };
+  }
 
-export class TaskProcessor {
-  static async processJob(job: Job<TaskJobData>): Promise<ProcessingResult> {
-    const { taskId, type, payload } = job.data;
+  const attempt = job.attemptsMade + 1;
+  const maxAttempts = job.opts.attempts ?? MAX_ATTEMPTS;
+  const event = (status: TaskStatus, progress: number, extra: { message?: string; error?: string | null } = {}) =>
+    publishTaskEvent({ userId: task.userId, taskId, status, progress, ...extra });
 
-    await job.updateProgress(10);
-    await delay(1000);
+  await taskRepository.markStarted(taskId, attempt);
+  await taskRepository.createTaskLog(taskId, 'INFO', `Attempt ${attempt}/${maxAttempts} started on worker`);
+  await event(TaskStatus.PROCESSING, 5);
 
-    switch (type) {
-      case 'FILE_PROCESSING':
-        return this.processFileProcessing(job);
+  try {
+    const payload = parseTaskPayload(task.type, task.payload);
+    const outcome = await jobHandlers[task.type]({
+      taskId,
+      userId: task.userId,
+      payload,
+      progress: async (percent, message) => {
+        await job.updateProgress(percent);
+        await taskRepository.updateProgress(taskId, percent);
+        if (message) await taskRepository.createTaskLog(taskId, 'INFO', message);
+        await event(TaskStatus.PROCESSING, percent, { message });
+      },
+    });
 
-      case 'WEB_SCRAPE':
-        return this.processWebScrape(job);
+    if (outcome.artifact) await taskRepository.saveArtifact(taskId, outcome.artifact);
+    await taskRepository.markCompleted(taskId, outcome.output);
+    await taskRepository.createTaskLog(taskId, 'INFO', outcome.message);
+    await event(TaskStatus.COMPLETED, 100, { message: outcome.message });
+    return outcome.output;
+  } catch (raw) {
+    const err = toUnrecoverable(raw) as Error;
+    const final = err instanceof UnrecoverableError || attempt >= maxAttempts;
 
-      case 'REPORT_GENERATION':
-        return this.processReportGeneration(job);
-
-      case 'DATA_EXPORT':
-        return this.processDataExport(job);
-
-      case 'NOTIFICATION_DISPATCH':
-        return this.processNotificationDispatch(job);
-
-      default:
-        return this.processDefaultTask(job);
+    if (final) {
+      // Park it first: once the row says FAILED, the dead-letter entry must already exist.
+      await sendToDeadLetter({ taskId, userId: task.userId, type: task.type, error: err.message, attempts: attempt });
+      await taskRepository.markFailed(taskId, err.message);
+      await taskRepository.createTaskLog(
+        taskId,
+        'ERROR',
+        err instanceof UnrecoverableError && attempt < maxAttempts
+          ? `Failed with an error retrying can't fix: ${err.message}. Moved to the dead-letter queue.`
+          : `Failed after ${attempt} attempts: ${err.message}. Moved to the dead-letter queue.`
+      );
+      await event(TaskStatus.FAILED, task.progress, { error: err.message });
+    } else {
+      const waitMs = (job.opts.backoff as { delay?: number } | undefined)?.delay ?? 0;
+      await taskRepository.createTaskLog(
+        taskId,
+        'WARN',
+        `Attempt ${attempt} failed: ${err.message}. Retrying in ${(waitMs * 2 ** (attempt - 1)) / 1000}s.`
+      );
+      await event(TaskStatus.PROCESSING, task.progress, { message: `Attempt ${attempt} failed, retrying` });
     }
-  }
-
-  private static async processFileProcessing(job: Job<TaskJobData>): Promise<ProcessingResult> {
-    const fileName = job.data.payload?.fileName || 'document.pdf';
-
-    await job.updateProgress(30);
-    await delay(1500);
-
-    await job.updateProgress(65);
-    await delay(1500);
-
-    await job.updateProgress(90);
-    await delay(1000);
-
-    return {
-      success: true,
-      output: {
-        fileName,
-        pagesProcessed: 14,
-        extractedTextLength: 4820,
-        ocrConfidence: '98.5%',
-        summary: 'Extracted invoices, dates, customer details, and total line items.',
-      },
-      message: 'File processing & OCR text extraction completed successfully.',
-    };
-  }
-
-  private static async processWebScrape(job: Job<TaskJobData>): Promise<ProcessingResult> {
-    const url = job.data.payload?.targetUrl || 'https://example.com/products';
-
-    await job.updateProgress(25);
-    await delay(1200);
-
-    await job.updateProgress(50);
-    await delay(1500);
-
-    await job.updateProgress(85);
-    await delay(1200);
-
-    return {
-      success: true,
-      output: {
-        scrapedUrl: url,
-        itemsExtracted: 340,
-        priceChangesFound: 18,
-        stockStatus: 'In Stock',
-        scrapedAt: new Date().toISOString(),
-      },
-      message: 'Web scraping and catalog indexing completed.',
-    };
-  }
-
-  private static async processReportGeneration(job: Job<TaskJobData>): Promise<ProcessingResult> {
-    await job.updateProgress(40);
-    await delay(1500);
-
-    await job.updateProgress(80);
-    await delay(1500);
-
-    return {
-      success: true,
-      output: {
-        reportName: 'Q2_Financial_Summary.pdf',
-        fileSize: '4.2 MB',
-        downloadUrl: '/downloads/reports/Q2_Financial_Summary.pdf',
-        generatedAt: new Date().toISOString(),
-      },
-      message: 'Quarterly financial report PDF generated.',
-    };
-  }
-
-  private static async processDataExport(job: Job<TaskJobData>): Promise<ProcessingResult> {
-    await job.updateProgress(50);
-    await delay(1500);
-
-    return {
-      success: true,
-      output: {
-        exportFormat: 'CSV',
-        recordsExported: 12500,
-        downloadUrl: '/exports/data_export_2026.csv',
-      },
-      message: 'Data export file generated successfully.',
-    };
-  }
-
-  private static async processNotificationDispatch(job: Job<TaskJobData>): Promise<ProcessingResult> {
-    await job.updateProgress(35);
-    await delay(1000);
-
-    // Simulate intentional failure test if payload requests error testing
-    if (job.data.payload?.forceError) {
-      throw new Error('SMTP Gateway Timeout: Failed to establish TLS handshake with mail server.');
-    }
-
-    await job.updateProgress(85);
-    await delay(1200);
-
-    return {
-      success: true,
-      output: {
-        emailsSent: 1500,
-        deliveryRate: '99.8%',
-        bounced: 3,
-      },
-      message: 'Batch email notifications dispatched successfully.',
-    };
-  }
-
-  private static async processDefaultTask(job: Job<TaskJobData>): Promise<ProcessingResult> {
-    await job.updateProgress(50);
-    await delay(1500);
-
-    await job.updateProgress(90);
-    await delay(1000);
-
-    return {
-      success: true,
-      output: {
-        processedPayload: job.data.payload,
-        completedAt: new Date().toISOString(),
-      },
-      message: 'Generic asynchronous background task executed.',
-    };
+    throw err;
   }
 }

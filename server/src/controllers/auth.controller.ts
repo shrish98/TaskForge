@@ -12,8 +12,7 @@ export class AuthController {
       const result = await authService.register(
         validatedData.email,
         validatedData.password,
-        validatedData.name,
-        validatedData.role
+        validatedData.name
       );
 
       res.status(201).json(new ApiResponse(201, result, 'User registered successfully'));

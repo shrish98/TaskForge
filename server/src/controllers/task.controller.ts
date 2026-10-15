@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { taskService } from '../services/task.service.js';
-import { createTaskSchema, updateTaskSchema, taskQuerySchema } from '../validations/task.validation.js';
+import { createTaskSchema, updateTaskSchema, taskQuerySchema, idempotencyKeySchema } from '../validations/task.validation.js';
 import { ApiResponse } from '../utils/ApiResponse.js';
 import { ApiError } from '../utils/ApiError.js';
 
@@ -10,11 +10,18 @@ export class TaskController {
       if (!req.user) throw new ApiError(401, 'Unauthorized');
 
       const validatedData = createTaskSchema.parse(req.body);
-      const task = await taskService.createTask({
-        ...validatedData,
-        userId: req.user.userId,
-      });
+      const rawKey = req.get('Idempotency-Key');
+      const idempotencyKey = rawKey === undefined ? undefined : idempotencyKeySchema.parse(rawKey);
+      const { task, replayed } = await taskService.createTask(
+        { ...validatedData, userId: req.user.userId },
+        idempotencyKey
+      );
 
+      if (replayed) {
+        res.set('Idempotent-Replayed', 'true');
+        res.status(200).json(new ApiResponse(200, task, 'Task already created for this Idempotency-Key'));
+        return;
+      }
       res.status(201).json(new ApiResponse(201, task, 'Task created and queued successfully'));
     } catch (error) {
       next(error);
@@ -88,6 +95,23 @@ export class TaskController {
       const retriedTask = await taskService.retryTask(id, req.user.userId, req.user.role);
 
       res.status(200).json(new ApiResponse(200, retriedTask, 'Task re-queued for execution'));
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async downloadArtifact(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.user) throw new ApiError(401, 'Unauthorized');
+
+      const artifact = await taskService.getArtifact(req.params.id, req.user.userId, req.user.role);
+      res.set({
+        'Content-Type': artifact.mimeType,
+        'Content-Length': String(artifact.size),
+        'Content-Disposition': `attachment; filename="${artifact.fileName.replace(/[^\w.-]/g, '_')}"`,
+        'Cache-Control': 'private, no-store',
+      });
+      res.send(Buffer.from(artifact.data));
     } catch (error) {
       next(error);
     }

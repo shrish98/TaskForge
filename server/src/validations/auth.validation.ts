@@ -7,7 +7,8 @@ export const registerSchema = z.object({
     .min(8, 'Password must be at least 8 characters long')
     .max(100, 'Password cannot exceed 100 characters'),
   name: z.string().min(2, 'Name must be at least 2 characters long').max(50),
-  role: z.enum(['USER', 'ADMIN']).optional(),
+  // No role field: accounts sign up as USER. Letting the client pick ADMIN meant anyone could
+  // register as an admin and read every user's tasks. Admins are created by the seed script.
 });
 
 export const loginSchema = z.object({

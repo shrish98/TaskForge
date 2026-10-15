@@ -65,6 +65,7 @@ model Task {
   maxAttempts Int        @default(3)
   progress    Int        @default(0)
   scheduledAt DateTime?
+  startedAt   DateTime?
   completedAt DateTime?
   failedAt    DateTime?
   userId      String
@@ -72,6 +73,7 @@ model Task {
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
   taskLogs    TaskLog[]
+  artifact    TaskArtifact?
 
   @@index([userId, status])
   @@index([createdAt])
@@ -86,4 +88,16 @@ model TaskLog {
   createdAt DateTime @default(now())
 
   @@index([taskId])
+}
+
+// A file produced by a job (PDF report, CSV export). One per task, overwritten on retry.
+model TaskArtifact {
+  id        String   @id @default(uuid())
+  taskId    String   @unique
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  fileName  String
+  mimeType  String
+  size      Int
+  data      Bytes
+  createdAt DateTime @default(now())
 }
