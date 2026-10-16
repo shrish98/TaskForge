@@ -43,7 +43,7 @@ export const runOcr: JobHandler = async (ctx) => {
   const { imageUrl } = ctx.payload;
 
   await ctx.progress(15, `Downloading image from ${imageUrl}`);
-  const res = await safeFetch(imageUrl, { maxBytes: MAX_IMAGE_BYTES, timeoutMs: 20_000 });
+  const res = await safeFetch(imageUrl, { maxBytes: MAX_IMAGE_BYTES, timeoutMs: 20_000, signal: ctx.signal });
   if (res.status >= 400 && res.status < 500) {
     throw new UnrecoverableError(`Image download failed with HTTP ${res.status}`);
   }

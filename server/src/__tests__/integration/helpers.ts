@@ -99,6 +99,8 @@ export async function startFixtureServer(): Promise<Fixture> {
         const status = queue.shift() ?? 200;
         res.writeHead(status, { 'content-type': 'application/json' });
         res.end(JSON.stringify({ status }));
+      } else if (url.startsWith('/hang')) {
+        // Never answers, like a server that accepted the connection and froze.
       } else if (url.startsWith('/slow')) {
         setTimeout(() => {
           res.writeHead(200, { 'content-type': 'application/json' });

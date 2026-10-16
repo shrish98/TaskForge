@@ -50,7 +50,7 @@ export const runScrape: JobHandler = async (ctx) => {
   const { url, selector } = ctx.payload;
 
   await ctx.progress(20, `Fetching ${url}`);
-  const res = await safeFetch(url, { maxBytes: 3 * 1024 * 1024 });
+  const res = await safeFetch(url, { maxBytes: 3 * 1024 * 1024, signal: ctx.signal });
   // A 404 won't fix itself on retry; a 503 might.
   if (res.status >= 400 && res.status < 500 && res.status !== 408 && res.status !== 429) {
     throw new UnrecoverableError(`${url} returned HTTP ${res.status}`);

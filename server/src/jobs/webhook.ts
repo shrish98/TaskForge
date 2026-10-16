@@ -26,7 +26,14 @@ export const runWebhook: JobHandler = async (ctx) => {
 
   await ctx.progress(30, `POST ${webhookUrl}`);
   const started = performance.now();
-  const res = await safeFetch(webhookUrl, { method: 'POST', headers, body, timeoutMs: 10_000, maxBytes: 256 * 1024 });
+  const res = await safeFetch(webhookUrl, {
+    method: 'POST',
+    headers,
+    body,
+    timeoutMs: 10_000,
+    maxBytes: 256 * 1024,
+    signal: ctx.signal,
+  });
   const latencyMs = Math.round(performance.now() - started);
 
   if (isPermanent(res.status)) {

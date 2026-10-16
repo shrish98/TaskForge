@@ -130,6 +130,41 @@ export class TaskRepository {
     return prisma.taskAttempt.update({ where: { id }, data: { outcome, error, endedAt: new Date() } });
   }
 
+  /**
+   * Closes attempts left RUNNING by a worker that died mid-job. A task has at most one job, so
+   * when a new attempt starts (or the task is given up on), any attempt still RUNNING is one
+   * whose worker never came back to finish it.
+   */
+  async closeOrphanedAttempts(taskId: string, error: string) {
+    const { count } = await prisma.taskAttempt.updateMany({
+      where: { taskId, outcome: 'RUNNING' },
+      data: { outcome: 'FAILED', error, endedAt: new Date() },
+    });
+    return count;
+  }
+
+  /**
+   * Fails a task that is still PENDING or PROCESSING. Returns false if it already finished, so
+   * two workers (or a worker and the sweeper) noticing the same dead job don't both report it.
+   */
+  async markFailedIfUnfinished(id: string, error: string) {
+    const { count } = await prisma.task.updateMany({
+      where: { id, status: { in: [TaskStatus.PENDING, TaskStatus.PROCESSING] } },
+      data: { status: TaskStatus.FAILED, error, failedAt: new Date() },
+    });
+    return count === 1;
+  }
+
+  /** Unfinished tasks nothing has written to for a while: the sweeper checks these against the queue. */
+  async findQuietUnfinished(quietSince: Date, take = 100) {
+    return prisma.task.findMany({
+      where: { status: { in: [TaskStatus.PENDING, TaskStatus.PROCESSING] }, updatedAt: { lt: quietSince } },
+      select: { id: true, userId: true, type: true, status: true, attempts: true, progress: true },
+      orderBy: { updatedAt: 'asc' },
+      take,
+    });
+  }
+
   /** Only moves progress forward on a running task, so a late write can't undo a finished one. */
   async updateProgress(id: string, progress: number) {
     return prisma.task.updateMany({

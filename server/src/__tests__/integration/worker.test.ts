@@ -1,10 +1,15 @@
 import { Worker } from 'bullmq';
 import { prisma } from '../../config/db';
+import { redisConfig } from '../../config/redis';
 import { createTaskWorker } from '../../worker';
+import { jobTimeoutsMs } from '../../jobs';
 import { shutdownOcr } from '../../jobs/ocr';
 import { signBody } from '../../jobs/webhook';
 import { subscribeTaskEvents } from '../../events/taskEvents';
 import { deadLetterQueue } from '../../queues/deadLetter.queue';
+import { TASK_QUEUE_NAME, TaskJobData, taskQueue } from '../../queues/task.queue';
+import { sweepLostTasks } from '../../queues/recovery';
+import { taskRepository } from '../../repositories/task.repository';
 import { api, closeAll, createTask, Fixture, makeAdmin, resetState, signUp, startFixtureServer, waitForTask } from './helpers';
 
 // A real BullMQ worker processes real jobs here, against a local fixture server.
@@ -195,6 +200,25 @@ describe('the worker in production conditions', () => {
     expect(after.status).toBe('COMPLETED');
   });
 
+  it('aborts an attempt that runs past its time limit and retries it', async () => {
+    const limit = jobTimeoutsMs.NOTIFICATION_DISPATCH;
+    jobTimeoutsMs.NOTIFICATION_DISPATCH = 300;
+    try {
+      const task = await createTask(token, { type: 'NOTIFICATION_DISPATCH', payload: { webhookUrl: `${fixture.url}/hang` } });
+      const done = await waitForTask(task.id);
+
+      expect(done.status).toBe('FAILED');
+      expect(done.attempts).toBe(3);
+      expect(done.error).toBe('Timed out after 0.3s');
+      expect(done.taskLogs.filter((l) => l.level === 'WARN')).toHaveLength(2);
+      const runs = await prisma.taskAttempt.findMany({ where: { taskId: task.id } });
+      expect(runs.map((r) => r.outcome)).toEqual(['FAILED', 'FAILED', 'FAILED']);
+      expect(await deadLetterQueue.getJob(task.id)).toBeDefined();
+    } finally {
+      jobTimeoutsMs.NOTIFICATION_DISPATCH = limit;
+    }
+  });
+
   it('skips a job whose task was deleted while it waited', async () => {
     await worker.close();
     const task = await createTask(token, { type: 'REPORT_GENERATION' });
@@ -203,5 +227,82 @@ describe('the worker in production conditions', () => {
     worker = createTaskWorker(1);
     await new Promise<void>((resolve) => worker.once('completed', () => resolve()));
     expect(await prisma.task.findUnique({ where: { id: task.id } })).toBeNull();
+  });
+});
+
+describe('a worker that dies mid-job', () => {
+  // Stands in for a worker process that crashes: it starts the attempt the way processTaskJob
+  // does, then never finishes. Force-closing it stops its lock renewals, as a crash would.
+  async function crashMidJob(taskId: string) {
+    let started!: () => void;
+    const running = new Promise<void>((r) => (started = r));
+    const doomed = new Worker<TaskJobData>(
+      TASK_QUEUE_NAME,
+      async (job) => {
+        await taskRepository.markStarted(job.data.taskId, job.attemptsMade + 1);
+        await taskRepository.startAttempt(job.data.taskId, job.attemptsMade + 1, 'doomed-worker');
+        started();
+        await new Promise(() => undefined);
+      },
+      // skipStalledCheck: stall checks are throttled queue-wide, and this worker's 30 s default
+      // interval would hold off the fast checks of the worker that takes over.
+      { connection: redisConfig, lockDuration: 300, skipStalledCheck: true }
+    );
+    await running;
+    await doomed.close(true);
+    expect((await prisma.task.findUniqueOrThrow({ where: { id: taskId } })).status).toBe('PROCESSING');
+  }
+
+  const fastStallCheck = { lockDuration: 300, stalledInterval: 200 };
+
+  beforeEach(async () => {
+    // The default worker ran a stall check on start, which throttles the next one for 30 s.
+    await worker.close();
+    await (await taskQueue.client).del(taskQueue.keys['stalled-check']);
+  });
+
+  it('hands the job to another worker and closes the dead attempt', async () => {
+    const task = await createTask(token, { type: 'REPORT_GENERATION' });
+    await crashMidJob(task.id);
+
+    worker = createTaskWorker(1, fastStallCheck);
+    const done = await waitForTask(task.id);
+
+    expect(done.status).toBe('COMPLETED');
+    const runs = await prisma.taskAttempt.findMany({ where: { taskId: task.id }, orderBy: { startedAt: 'asc' } });
+    expect(runs.map((r) => [r.worker === 'doomed-worker', r.outcome])).toEqual([
+      [true, 'FAILED'],
+      [false, 'COMPLETED'],
+    ]);
+    expect(runs[0].error).toMatch(/stopped responding/);
+    expect(runs[0].endedAt).not.toBeNull();
+  });
+
+  it('fails the task when the job stalls past the limit, instead of leaving it PROCESSING', async () => {
+    const task = await createTask(token, { type: 'REPORT_GENERATION' });
+    await crashMidJob(task.id);
+
+    worker = createTaskWorker(1, { ...fastStallCheck, maxStalledCount: 0 });
+    const done = await waitForTask(task.id);
+
+    expect(done.status).toBe('FAILED');
+    expect(done.error).toMatch(/stopped responding more than once/);
+    expect(done.taskLogs.some((l) => l.level === 'ERROR' && /dead-letter/.test(l.message))).toBe(true);
+    expect(await prisma.taskAttempt.count({ where: { taskId: task.id, outcome: 'RUNNING' } })).toBe(0);
+    expect((await deadLetterQueue.getJob(task.id))?.data).toMatchObject({ taskId: task.id });
+  });
+
+  it('sweeps up a task whose job vanished from the queue', async () => {
+    const task = await createTask(token, { type: 'REPORT_GENERATION', scheduledAt: new Date(Date.now() + 3_600_000).toISOString() });
+    const scheduled = await createTask(token, { type: 'REPORT_GENERATION', scheduledAt: new Date(Date.now() + 3_600_000).toISOString() });
+    await (await taskQueue.getJob(task.id))!.remove(); // Redis lost it
+
+    expect(await sweepLostTasks(0)).toBe(1);
+    const lost = await prisma.task.findUniqueOrThrow({ where: { id: task.id } });
+    expect(lost.status).toBe('FAILED');
+    expect(lost.error).toBe('The job was lost from the queue');
+    // A task still waiting on its job is left alone, however long it has been quiet.
+    expect((await prisma.task.findUniqueOrThrow({ where: { id: scheduled.id } })).status).toBe('PENDING');
+    expect(await sweepLostTasks(0)).toBe(0);
   });
 });

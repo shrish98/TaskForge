@@ -64,6 +64,8 @@ export interface SafeFetchOptions {
   body?: string;
   timeoutMs?: number;
   maxBytes?: number;
+  /** Cancels the request early, on top of the timeout (e.g. when the job is aborted). */
+  signal?: AbortSignal;
 }
 
 export interface SafeFetchResult {
@@ -76,7 +78,7 @@ export interface SafeFetchResult {
 const MAX_REDIRECTS = 3;
 
 export async function safeFetch(raw: string, options: SafeFetchOptions = {}): Promise<SafeFetchResult> {
-  const { timeoutMs = 15_000, maxBytes = 5 * 1024 * 1024, ...init } = options;
+  const { timeoutMs = 15_000, maxBytes = 5 * 1024 * 1024, signal: cancel, ...init } = options;
   let target = raw;
 
   // Follow redirects by hand so every hop is checked, not just the first URL.
@@ -85,7 +87,7 @@ export async function safeFetch(raw: string, options: SafeFetchOptions = {}): Pr
     const res = await fetch(url, {
       ...init,
       redirect: 'manual',
-      signal: AbortSignal.timeout(timeoutMs),
+      signal: cancel ? AbortSignal.any([AbortSignal.timeout(timeoutMs), cancel]) : AbortSignal.timeout(timeoutMs),
       headers: { 'user-agent': 'TaskForge/1.0 (+https://github.com/shrish98/TaskForge)', ...init.headers },
     });
 

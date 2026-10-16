@@ -3,7 +3,7 @@ import { Job, UnrecoverableError } from 'bullmq';
 import { TaskStatus } from '@prisma/client';
 import { ZodError } from 'zod';
 import { prisma } from '../config/db.js';
-import { jobHandlers } from '../jobs/index.js';
+import { jobHandlers, jobTimeoutsMs } from '../jobs/index.js';
 import { UnsafeUrlError } from '../lib/safeFetch.js';
 import { taskRepository } from '../repositories/task.repository.js';
 import { publishTaskEvent } from '../events/taskEvents.js';
@@ -21,6 +21,23 @@ const toUnrecoverable = (err: unknown) =>
   err instanceof UnsafeUrlError || err instanceof ZodError
     ? new UnrecoverableError(err instanceof ZodError ? `Invalid payload: ${err.issues[0]?.message}` : err.message)
     : err;
+
+/** An attempt that ran past its type's limit. Retried like any other failure: it may be a slow moment. */
+export class JobTimeoutError extends Error {
+  constructor(limitMs: number) {
+    super(`Timed out after ${limitMs / 1000}s`);
+    this.name = 'JobTimeoutError';
+  }
+}
+
+/** Settles with `work`, or rejects as soon as `signal` aborts, whichever comes first. */
+function untilAborted<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(signal.reason);
+    signal.addEventListener('abort', onAbort, { once: true });
+    work.then(resolve, reject).finally(() => signal.removeEventListener('abort', onAbort));
+  });
+}
 
 /**
  * Runs one attempt of a task. Every database write happens here, in order, before the job
@@ -40,24 +57,37 @@ export async function processTaskJob(job: Job<TaskJobData>) {
   const event = (status: TaskStatus, progress: number, extra: { message?: string; error?: string | null } = {}) =>
     publishTaskEvent({ userId: task.userId, taskId, status, progress, ...extra });
 
+  // A RUNNING attempt here belongs to a worker that died mid-job; BullMQ is handing it to us.
+  if (await taskRepository.closeOrphanedAttempts(taskId, 'The worker running this attempt stopped responding')) {
+    await taskRepository.createTaskLog(taskId, 'WARN', 'The previous worker stopped responding mid-attempt; running it again');
+  }
   await taskRepository.markStarted(taskId, attempt);
   const run = await taskRepository.startAttempt(taskId, attempt, WORKER_ID);
   await taskRepository.createTaskLog(taskId, 'INFO', `Attempt ${attempt}/${maxAttempts} started on worker`);
   await event(TaskStatus.PROCESSING, 5);
 
+  const limitMs = jobTimeoutsMs[task.type];
+  const abort = new AbortController();
+  const timer = setTimeout(() => abort.abort(new JobTimeoutError(limitMs)), limitMs);
+
   try {
     const payload = parseTaskPayload(task.type, task.payload);
-    const outcome = await jobHandlers[task.type]({
+    const handler = jobHandlers[task.type]({
       taskId,
       userId: task.userId,
       payload,
+      signal: abort.signal,
       progress: async (percent, message) => {
+        // A handler that ignored the abort is still running; stop it writing over the failure.
+        abort.signal.throwIfAborted();
         await job.updateProgress(percent);
         await taskRepository.updateProgress(taskId, percent);
         if (message) await taskRepository.createTaskLog(taskId, 'INFO', message);
         await event(TaskStatus.PROCESSING, percent, { message });
       },
     });
+    const outcome = await untilAborted(handler, abort.signal);
+    clearTimeout(timer);
 
     if (outcome.artifact) await taskRepository.saveArtifact(taskId, outcome.artifact);
     await taskRepository.finishAttempt(run.id, 'COMPLETED');
@@ -66,6 +96,7 @@ export async function processTaskJob(job: Job<TaskJobData>) {
     await event(TaskStatus.COMPLETED, 100, { message: outcome.message });
     return outcome.output;
   } catch (raw) {
+    clearTimeout(timer);
     const err = toUnrecoverable(raw) as Error;
     const final = err instanceof UnrecoverableError || attempt >= maxAttempts;
     await taskRepository.finishAttempt(run.id, 'FAILED', err.message);

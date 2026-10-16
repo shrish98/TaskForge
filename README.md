@@ -60,6 +60,13 @@ Attempts are stored as their own rows (`TaskAttempt`), so the timeline and the s
 - **Duplicate requests.** `POST /api/v1/tasks` accepts an `Idempotency-Key` header. A repeated request with the same key gets the original task back (`200`, `Idempotent-Replayed: true`) instead of creating a duplicate job. The key is claimed atomically with Redis `SET NX`, so concurrent duplicates also produce one task.
 - **Webhook deduplication.** Webhook deliveries carry the task id as their `Idempotency-Key`, so a receiver can drop duplicates when a retry follows a delivery that landed but timed out.
 
+### Jobs that hang or whose worker dies
+
+- **Time limits.** Each attempt has a limit per job type (`jobTimeoutsMs` in `server/src/jobs/index.ts`: 2 min for OCR, 30 s for webhooks, 1 min otherwise). Past it, the attempt is aborted and counts as a normal failed attempt, so it is retried. The abort signal reaches in-flight HTTP requests. A handler that ignores it can't write progress over the failure.
+- **Crashed workers.** If a worker dies mid-job, its lock expires and BullMQ hands the job to another worker. The dead attempt, still `RUNNING` in the database, is closed as failed when the job starts again.
+- **Jobs that keep crashing their worker.** After too many stalls, BullMQ fails the job without running the processor, so nothing would record the failure. The worker's `failed` listener does it instead, so the task goes to `FAILED` and the dead-letter queue rather than staying `PROCESSING`.
+- **The sweeper.** Every 5 minutes each worker looks at unfinished tasks nothing has written to for 15 minutes. If a task's job is gone from Redis, or failed without the database knowing, the task is failed and dead-lettered. Tasks whose job is still waiting, delayed or running are left alone.
+
 ### Graceful shutdown
 
 On `SIGTERM`, the process shuts down in this order:
@@ -141,7 +148,7 @@ Optional settings:
 cd server
 npm test                     # 47 unit tests: SSRF guard, scraper, CSV, signing, validation
 TEST_DATABASE_URL=postgresql://…/taskforge_test TEST_REDIS_URL=redis://localhost:6379/1 \
-  npm run test:integration   # 23 tests against real Postgres, Redis and a BullMQ worker
+  npm run test:integration   # 27 tests against real Postgres, Redis and a BullMQ worker
 ```
 
 The integration tests run real jobs against a local fixture server. They cover:
@@ -152,6 +159,9 @@ The integration tests run real jobs against a local fixture server. They cover:
 - idempotency under concurrent requests;
 - ordered live events;
 - a worker finishing its job before shutting down;
+- a hung attempt being aborted at its time limit and retried;
+- a worker crashing mid-job: the job moving to another worker, and failing cleanly once it has stalled too often;
+- the sweeper failing a task whose job vanished from Redis;
 - users being kept out of each other's tasks.
 
 They refuse to run unless the database name contains `test` and Redis uses a database other than 0, because they wipe both.
